@@ -194,7 +194,7 @@ class TestOctoFireGuardPlugin(unittest.TestCase):
     @patch('flask.jsonify')
     def test_on_api_command_test_emergency_actions_gcode(self, mock_jsonify):
         """Test that test_emergency_actions API command works in GCode mode"""
-        mock_jsonify.return_value = {"success": True, "mode": "gcode"}
+        mock_jsonify.return_value = {"success": True, "mode": "gcode", "message": "GCode commands executed successfully"}
         
         result = self.plugin.on_api_command("test_emergency_actions", {})
         
@@ -202,17 +202,19 @@ class TestOctoFireGuardPlugin(unittest.TestCase):
         self.plugin._logger.info.assert_any_call("Testing emergency actions")
         self.plugin._logger.info.assert_any_call("Testing GCode termination commands")
         
-        # Verify GCode commands were sent
-        self.plugin._printer.commands.assert_called()
+        # Verify specific GCode commands were sent
+        self.plugin._printer.commands.assert_has_calls([call("M112"), call("M104 S0"), call("M140 S0")])
         self.assertEqual(self.plugin._printer.commands.call_count, 3)
         
+        # Verify the API response
         mock_jsonify.assert_called_once_with(success=True, mode="gcode", message="GCode commands executed successfully")
+        self.assertEqual(result, {"success": True, "mode": "gcode", "message": "GCode commands executed successfully"})
     
     @patch('flask.jsonify')
     def test_on_api_command_test_emergency_actions_psu(self, mock_jsonify):
         """Test that test_emergency_actions API command works in PSU mode"""
         self.settings_dict["termination_mode"] = "psu"
-        mock_jsonify.return_value = {"success": True, "mode": "psu"}
+        mock_jsonify.return_value = {"success": True, "mode": "psu", "message": "PSU termination executed successfully"}
         
         # Mock PSU plugin
         mock_psu_plugin = Mock()
@@ -227,23 +229,57 @@ class TestOctoFireGuardPlugin(unittest.TestCase):
         self.plugin._logger.info.assert_any_call("Testing emergency actions")
         self.plugin._logger.info.assert_any_call("Testing PSU termination")
         
+        # Verify heater turn-off commands were sent before PSU shutdown
+        self.plugin._printer.commands.assert_has_calls([call("M104 S0"), call("M140 S0")])
+        
         # Verify PSU plugin was called
         mock_psu_implementation.turn_psu_off.assert_called_once()
         
+        # Verify the API response
         mock_jsonify.assert_called_once_with(success=True, mode="psu", message="PSU termination executed successfully")
+        self.assertEqual(result, {"success": True, "mode": "psu", "message": "PSU termination executed successfully"})
     
     @patch('flask.jsonify')
     def test_on_api_command_test_emergency_actions_unknown_mode(self, mock_jsonify):
         """Test that test_emergency_actions handles unknown termination mode"""
         self.settings_dict["termination_mode"] = "invalid_mode"
-        mock_jsonify.return_value = ({"success": False, "error": "Unknown termination mode"}, 400)
+        mock_response = {"success": False, "error": "Unknown termination mode"}
+        mock_jsonify.return_value = mock_response
         
         result = self.plugin.on_api_command("test_emergency_actions", {})
         
         # Verify error was logged
         self.plugin._logger.error.assert_any_call("Unknown termination mode: invalid_mode")
         
+        # Verify the API response
         mock_jsonify.assert_called_once_with(success=False, error="Unknown termination mode")
+        # Verify result is a tuple with response and status code
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0], mock_response)
+        self.assertEqual(result[1], 400)
+    
+    @patch('flask.jsonify')
+    def test_on_api_command_test_emergency_actions_exception(self, mock_jsonify):
+        """Test that test_emergency_actions handles exceptions during execution"""
+        mock_response = {"success": False, "error": "Failed to execute emergency actions. Check the logs for details."}
+        mock_jsonify.return_value = mock_response
+        
+        # Make the printer commands raise an exception
+        self.plugin._printer.commands.side_effect = Exception("Test exception")
+        
+        result = self.plugin.on_api_command("test_emergency_actions", {})
+        
+        # Verify error was logged with exception info
+        self.plugin._logger.error.assert_any_call("Error testing emergency actions: Test exception", exc_info=True)
+        
+        # Verify the API response
+        mock_jsonify.assert_called_once_with(success=False, error="Failed to execute emergency actions. Check the logs for details.")
+        # Verify result is a tuple with response and status code 500
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0], mock_response)
+        self.assertEqual(result[1], 500)
 
     def test_is_api_protected(self):
         """Test that API protection is explicitly declared"""
