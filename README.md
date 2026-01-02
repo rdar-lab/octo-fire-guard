@@ -154,7 +154,7 @@ octo-fire-guard/
 
 ### Testing
 
-The plugin includes a comprehensive test suite with **53 unit tests** covering all major functionality including the new self-test monitoring feature.
+The plugin includes a comprehensive unit test suite covering all major functionality, including the new self-test monitoring feature.
 
 To run the tests:
 
