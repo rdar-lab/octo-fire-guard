@@ -6,7 +6,7 @@ An OctoPrint plugin that monitors printer temperatures in real-time to prevent f
 
 You must ask yourself why?
 
-Well, I had an incident that the external mosfet failed in a closed-circuit mode. That meant that the tempreature kept raising with nothing on the printer firmware that can stop it, nothing! only shuting down the power supply (PSU) to the printer can prevent fire in that case. I decided to hook the printer to a smart switch and install PSU control to allow the power to be cut off automatically on that case.
+Well, I had an incident that the external mosfet failed in a closed-circuit mode. That meant that the temperature kept raising with nothing on the printer firmware that can stop it, nothing! only shuting down the power supply (PSU) to the printer can prevent fire in that case. I decided to hook the printer to a smart switch and install PSU control to allow the power to be cut off automatically on that case.
 
 ## Features
 
