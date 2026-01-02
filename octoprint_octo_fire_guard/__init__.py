@@ -2,7 +2,10 @@
 from __future__ import absolute_import
 
 import octoprint.plugin
+import octoprint.util
 import flask
+import time
+import threading
 
 __plugin_name__ = "Octo Fire Guard"
 __plugin_pythoncompat__ = ">=3.8,<4"
@@ -12,12 +15,20 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
                           octoprint.plugin.AssetPlugin,
                           octoprint.plugin.TemplatePlugin,
                           octoprint.plugin.StartupPlugin,
-                          octoprint.plugin.SimpleApiPlugin):
+                          octoprint.plugin.SimpleApiPlugin,
+                          octoprint.plugin.ShutdownPlugin):
 
     def __init__(self):
         self._hotend_threshold_exceeded = False
         self._heatbed_threshold_exceeded = False
         self._last_temperatures = {}
+        self._last_hotend_data_time = None
+        self._last_heatbed_data_time = None
+        self._data_timeout_warning_sent = False
+        self._warned_missing_sensors = set()  # Track which sensors we've warned about
+        self._monitoring_timer = None
+        self._startup_time = time.time()  # Initial startup time; may be updated in on_after_startup
+        self._state_lock = threading.RLock()  # Protect shared state from race conditions
 
     ##~~ SettingsPlugin mixin
 
@@ -29,7 +40,9 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
             termination_gcode="M112\nM104 S0\nM140 S0",  # Emergency stop + turn off heaters
             psu_plugin_name="psucontrol",  # Name of PSU control plugin
             enable_monitoring=True,  # Enable/disable monitoring
-            check_interval=1  # Check interval in seconds (not currently used, uses temperature callback)
+            check_interval=1,  # Check interval in seconds (not currently used, uses temperature callback)
+            enable_data_monitoring=True,  # Enable/disable temperature data timeout monitoring
+            temperature_data_timeout=300  # Timeout in seconds (5 minutes) before warning about missing temperature data
         )
 
     def get_settings_version(self):
@@ -55,12 +68,115 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
 
     def on_after_startup(self):
         self._logger.debug("Initializing Octo Fire Guard plugin")
+        self._startup_time = time.time()  # Set startup time when plugin actually starts
         self._logger.info("Octo Fire Guard plugin started")
         self._logger.info("Hotend threshold: {}°C".format(self._settings.get(["hotend_threshold"])))
         self._logger.info("Heatbed threshold: {}°C".format(self._settings.get(["heatbed_threshold"])))
         self._logger.info("Termination mode: {}".format(self._settings.get(["termination_mode"])))
         self._logger.debug("Monitoring enabled: {}".format(self._settings.get_boolean(["enable_monitoring"])))
+        
+        # Start background monitoring timer if data monitoring is enabled
+        if self._settings.get_boolean(["enable_data_monitoring"]):
+            self._start_monitoring_timer()
+
         self._logger.debug("Plugin initialization complete")
+
+    def on_shutdown(self):
+        """Clean up timer on shutdown"""
+        self._stop_monitoring_timer()
+
+    def _start_monitoring_timer(self):
+        """Start the background monitoring timer"""
+        if self._monitoring_timer is not None:
+            self._stop_monitoring_timer()
+        
+        # Check every 30 seconds for temperature data timeout
+        self._monitoring_timer = octoprint.util.RepeatedTimer(30, self._check_temperature_data_timeout)
+        self._monitoring_timer.start()
+        self._logger.info("Temperature data monitoring timer started")
+
+    def _stop_monitoring_timer(self):
+        """Stop the background monitoring timer"""
+        if self._monitoring_timer is not None:
+            self._monitoring_timer.cancel()
+            self._monitoring_timer = None
+            self._logger.info("Temperature data monitoring timer stopped")
+
+    def _check_temperature_data_timeout(self):
+        """Check if we haven't received temperature data in a while"""
+        if not self._settings.get_boolean(["enable_data_monitoring"]):
+            return
+
+        # Only check if printer is connected
+        if not self._printer.is_operational():
+            # Reset warning state when printer is not connected
+            with self._state_lock:
+                self._data_timeout_warning_sent = False
+                self._last_hotend_data_time = None
+                self._last_heatbed_data_time = None
+                if self._warned_missing_sensors is not None:
+                    self._warned_missing_sensors.clear()
+            return
+
+        timeout = self._settings.get_int(["temperature_data_timeout"])
+        current_time = time.time()
+        
+        # Check if we have timeout for hotend or heatbed
+        missing_sensors = []
+        
+        with self._state_lock:
+            startup_time = self._startup_time if self._startup_time else current_time
+            
+            if self._last_hotend_data_time is not None:
+                time_since_hotend = current_time - self._last_hotend_data_time
+                if time_since_hotend > timeout:
+                    missing_sensors.append("hotend")
+            elif current_time - startup_time > timeout:
+                # If we're operational but never got hotend data after startup timeout, that's a problem
+                missing_sensors.append("hotend")
+            
+            if self._last_heatbed_data_time is not None:
+                time_since_heatbed = current_time - self._last_heatbed_data_time
+                if time_since_heatbed > timeout:
+                    missing_sensors.append("heatbed")
+            # Note: We don't check for startup timeout on heatbed because not all printers have heatbeds
+            # We only warn if we've previously received heatbed data and then it stops
+            
+            # Send warning if we have missing sensors and haven't already warned about them
+            if missing_sensors and not self._data_timeout_warning_sent:
+                self._send_data_timeout_warning(missing_sensors, timeout)
+                self._data_timeout_warning_sent = True
+                self._warned_missing_sensors = set(missing_sensors)
+            elif not missing_sensors and self._data_timeout_warning_sent:
+                # Clear warning state if all data has resumed
+                self._logger.info("Temperature data has resumed for all sensors")
+                self._data_timeout_warning_sent = False
+                self._warned_missing_sensors.clear()
+                # Notify frontend to dismiss the warning notification
+                self._plugin_manager.send_plugin_message(
+                    self._identifier,
+                    dict(type="data_timeout_cleared")
+                )
+
+    def _send_data_timeout_warning(self, missing_sensors, timeout):
+        """Send a warning notification about missing temperature data"""
+        sensors_str = " and ".join(missing_sensors)
+        message = "No temperature data received from {} for {} minutes. Plugin may not be monitoring correctly.".format(
+            sensors_str, int(timeout / 60)
+        )
+        
+        self._logger.warning("TEMPERATURE DATA TIMEOUT: {}".format(message))
+        
+        # Send notification to OctoPrint notification system
+        self._plugin_manager.send_plugin_message(
+            self._identifier,
+            dict(
+                type="data_timeout_warning",
+                sensors=missing_sensors,
+                timeout=timeout,
+                message=message
+            )
+        )
 
     ##~~ SimpleApiPlugin mixin
 
@@ -127,6 +243,7 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
             self._logger.debug("Monitoring is disabled, skipping temperature checks")
             return parsed_temperatures
 
+        current_time = time.time()
         self._logger.debug("Monitoring is enabled, checking temperatures")
         self._logger.debug("Received parsed_temperatures: {}".format(parsed_temperatures))
         
@@ -147,6 +264,23 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
                 temp_data = parsed_temperatures[tool_key]
                 if isinstance(temp_data, tuple) and len(temp_data) >= 2:
                     current_temp = temp_data[0]
+                    # Update last data time if we got valid temperature data
+                    if current_temp is not None:
+                        with self._state_lock:
+                            self._last_hotend_data_time = current_time
+                            # Remove hotend from warned sensors if it was warned about
+                            if "hotend" in self._warned_missing_sensors:
+                                self._warned_missing_sensors.discard("hotend")
+                                self._logger.info("Hotend temperature data resumed")
+                                # If no more sensors are being warned about, clear the warning state
+                                if not self._warned_missing_sensors:
+                                    self._data_timeout_warning_sent = False
+                                    # Notify frontend to dismiss the warning notification
+                                    self._plugin_manager.send_plugin_message(
+                                        self._identifier,
+                                        dict(type="data_timeout_cleared")
+                                    )
+                    
                     self._logger.debug("{} current temperature: {}°C".format(tool_key, current_temp))
                     if current_temp is not None and current_temp > hotend_threshold:
                         self._logger.debug("{} temperature {} exceeds threshold {}".format(
@@ -185,6 +319,23 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
             temp_data = parsed_temperatures[bed_key]
             if isinstance(temp_data, tuple) and len(temp_data) >= 2:
                 current_temp = temp_data[0]
+                # Update last data time if we got valid temperature data
+                if current_temp is not None:
+                    with self._state_lock:
+                        self._last_heatbed_data_time = current_time
+                        # Remove heatbed from warned sensors if it was warned about
+                        if "heatbed" in self._warned_missing_sensors:
+                            self._warned_missing_sensors.discard("heatbed")
+                            self._logger.info("Heatbed temperature data resumed")
+                            # If no more sensors are being warned about, clear the warning state
+                            if not self._warned_missing_sensors:
+                                self._data_timeout_warning_sent = False
+                                # Notify frontend to dismiss the warning notification
+                                self._plugin_manager.send_plugin_message(
+                                    self._identifier,
+                                    dict(type="data_timeout_cleared")
+                                )
+                
                 self._logger.debug("Heatbed current temperature: {}°C".format(current_temp))
                 if current_temp is not None and current_temp > heatbed_threshold:
                     self._logger.debug("Heatbed temperature {} exceeds threshold {}".format(
