@@ -189,6 +189,13 @@ class TestOctoFireGuardPlugin(unittest.TestCase):
         
         mock_jsonify.assert_called_once_with(success=True)
     
+    def test_is_api_protected(self):
+        """Test that API protection is explicitly declared"""
+        is_protected = self.plugin.is_api_protected()
+        
+        # API should be protected (require authentication)
+        self.assertTrue(is_protected)
+    
     # ===== Temperature Callback Tests =====
     
     def test_temperature_callback_monitoring_disabled(self):
