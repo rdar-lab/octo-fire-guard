@@ -44,8 +44,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Frontend uses Knockout.js for reactive UI
 - CSS provides prominent, attention-grabbing alert styling
 
-## [Unreleased]
-
 ### Fixed
 - **UI Customizer Compatibility**: Fixed conflicts with "UI Customizer (0.1.9.91)" plugin
   - Removed strict element bindings that caused Save button spinner to hang
@@ -54,10 +52,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Plugin now works correctly when UI Customizer or other DOM-modifying plugins are active
   - Both "Save" button and "Test Alert System" functionality now work reliably with UI Customizer
 
-### Technical Details
-- Changed viewModel registration from strict element array `["#settings_plugin_octo_fire_guard", "#octo_fire_guard_alert_modal"]` to empty array `[]`
-- Implemented `onAfterBinding` lifecycle hook for manual Knockout.js binding of alert modal
-- Enhanced error handling in API command failures with more descriptive error messages
+    ### Technical Details
+    - Changed viewModel registration from strict element array `["#settings_plugin_octo_fire_guard", "#octo_fire_guard_alert_modal"]` to empty array `[]`
+    - Implemented `onAfterBinding` lifecycle hook for manual Knockout.js binding of alert modal
+    - Enhanced error handling in API command failures with more descriptive error messages
 
 ### Potential Future Enhancements
 - Per-tool threshold configuration
