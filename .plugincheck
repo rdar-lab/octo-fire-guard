@@ -1,0 +1,14 @@
+# Configuration for OctoPrint's plugin repository automated checks
+# This file enables automatic validation when submitting to the official plugin repository
+
+metadata:
+  # Plugin metadata validation
+  validate: true
+
+structure:
+  # Validate plugin file structure
+  validate: true
+
+functionality:
+  # Basic functionality checks
+  validate: true
