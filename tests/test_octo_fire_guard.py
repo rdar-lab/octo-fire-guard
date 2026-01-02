@@ -702,6 +702,24 @@ class TestOctoFireGuardPlugin(unittest.TestCase):
         self.assertEqual(result, parsed_temps)
         self.plugin._plugin_manager.send_plugin_message.assert_not_called()
     
+    def test_temperature_callback_invalid_tool_keys(self):
+        """Test that invalid tool keys like 'T', 'Ta', 'Tb' are not matched"""
+        # These should NOT be recognized as valid tool keys
+        parsed_temps = {"T": (200.0, 210.0), "Ta": (205.0, 215.0), "Tb": (210.0, 220.0), "B": (80.0, 90.0)}
+        result = self.plugin.temperature_callback(None, parsed_temps)
+        
+        # Should not crash, should not trigger any alerts
+        self.assertEqual(result, parsed_temps)
+        self.plugin._plugin_manager.send_plugin_message.assert_not_called()
+        self.assertFalse(self.plugin._hotend_threshold_exceeded)
+        
+        # None of the debug messages should indicate checking these as hotends
+        debug_calls = self.plugin._logger.debug.call_args_list
+        debug_strs = [str(call) for call in debug_calls]
+        self.assertFalse(any("Checking hotend temperature for T" == str(call) or 
+                            "Checking hotend temperature for Ta" in str(call) or
+                            "Checking hotend temperature for Tb" in str(call) for call in debug_strs))
+    
     # ===== Debug Logging Tests =====
     
     def test_on_after_startup_debug_logging(self):
