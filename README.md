@@ -98,7 +98,12 @@ octo-fire-guard/
 │   │       └── octo_fire_guard.js
 │   └── templates/
 │       └── octo_fire_guard_settings.jinja2
+├── tests/
+│   ├── __init__.py
+│   ├── test_octo_fire_guard.py  # Comprehensive unit tests
+│   └── README.md                # Test documentation
 ├── setup.py
+├── run_tests.py                 # Test runner script
 ├── MANIFEST.in
 ├── LICENSE
 └── README.md
@@ -109,6 +114,24 @@ octo-fire-guard/
 - **Temperature Monitoring**: Uses OctoPrint's `octoprint.comm.protocol.temperatures.received` hook
 - **Alert System**: Sends plugin messages to the frontend for display
 - **Emergency Response**: Executes termination commands via printer commands or plugin messages
+
+### Testing
+
+The plugin includes a comprehensive test suite with **38 unit tests** covering all major functionality.
+
+To run the tests:
+
+```bash
+python3 run_tests.py
+```
+
+Or run tests directly:
+
+```bash
+python3 tests/test_octo_fire_guard.py -v
+```
+
+See [tests/README.md](tests/README.md) for detailed information about the test suite.
 
 ## License
 
