@@ -46,7 +46,7 @@ When a temperature threshold is exceeded, a prominent alert modal appears with c
 
 ## Configuration
 
-After installation, configure the plugin in OctoPrint Settings → Plugins → Octo Fire Guard:
+After installation, configure the plugin in OctoPrint Settings → Plugins → Octo Fire Guard
 
 ### Temperature Thresholds
 
@@ -62,7 +62,7 @@ If the printer is connected but the plugin doesn't receive temperature data for 
 
 ### Termination Mode
 
-Choose how the plugin responds when a threshold is exceeded:
+Choose how the plugin responds when a threshold is exceeded
 
 #### GCode Commands Mode
 Execute custom GCode commands to handle the emergency. Default commands:
