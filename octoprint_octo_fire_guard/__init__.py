@@ -195,12 +195,25 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
             self._printer.commands("M104 S0")  # Turn off hotend
             self._printer.commands("M140 S0")  # Turn off bed
 
-            # Then send message to PSU control plugin
-            self._plugin_manager.send_plugin_message(
-                psu_plugin_name,
-                dict(command="turnPSUOff")
-            )
-            self._logger.info("PSU shutdown command sent")
+            # Try to access PSU control plugin and call its turn_psu_off method
+            psu_plugin = self._plugin_manager.get_plugin_info(psu_plugin_name)
+            if psu_plugin and psu_plugin.implementation:
+                # Try different methods that PSU control plugins might use
+                if hasattr(psu_plugin.implementation, 'turn_psu_off'):
+                    self._logger.info("Calling turn_psu_off method")
+                    psu_plugin.implementation.turn_psu_off()
+                elif hasattr(psu_plugin.implementation, 'turnPSUOff'):
+                    self._logger.info("Calling turnPSUOff method")
+                    psu_plugin.implementation.turnPSUOff()
+                else:
+                    self._logger.warning("PSU plugin found but no turn off method available")
+                    raise Exception("No turn off method found in PSU plugin")
+                
+                self._logger.info("PSU shutdown command sent successfully")
+            else:
+                self._logger.error("PSU control plugin '{}' not found or not loaded".format(psu_plugin_name))
+                raise Exception("PSU plugin not found")
+                
         except Exception as e:
             self._logger.error("Failed to execute PSU termination: {}".format(str(e)))
             # Fallback to GCode termination
