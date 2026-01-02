@@ -74,6 +74,8 @@ $(function() {
 
             if (data.type === "temperature_alert") {
                 self.showAlert(data);
+            } else if (data.type === "data_timeout_warning") {
+                self.showDataTimeoutWarning(data);
             }
         };
 
@@ -164,6 +166,30 @@ $(function() {
                 }
             } catch (e) {
                 console.error("Octo Fire Guard: Error closing alert", e);
+            }
+        };
+
+        // Show data timeout warning notification
+        self.showDataTimeoutWarning = function(data) {
+            try {
+                var sensorsStr = data.sensors.join(" and ");
+                var timeoutMinutes = Math.floor(data.timeout / 60);
+                
+                console.warn("Octo Fire Guard: Temperature data timeout - " + data.message);
+                
+                // Show OctoPrint notification
+                if (typeof PNotify !== "undefined") {
+                    new PNotify({
+                        title: "Octo Fire Guard: Self-Test Warning",
+                        text: "No temperature data received from " + sensorsStr + " for " + timeoutMinutes + " minutes. " +
+                              "The plugin may not be monitoring correctly. Please check your printer connection.",
+                        type: "warning",
+                        hide: false,  // Don't auto-hide
+                        icon: "fa fa-exclamation-triangle"
+                    });
+                }
+            } catch (e) {
+                console.error("Octo Fire Guard: Error showing data timeout warning", e);
             }
         };
 

@@ -13,6 +13,28 @@
                 {{ _('When enabled, the plugin will monitor temperatures and trigger alerts when thresholds are exceeded.') }}
             </span>
         </div>
+        
+        <div class="control-group">
+            <label class="checkbox">
+                <input type="checkbox" data-bind="checked: settings.plugins.octo_fire_guard.enable_data_monitoring">
+                {{ _('Enable self-test monitoring') }}
+            </label>
+            <span class="help-block octo-fire-guard-settings-help">
+                {{ _('When enabled, the plugin will monitor itself and issue warnings if temperature data stops arriving from the printer.') }}
+            </span>
+        </div>
+        
+        <div class="control-group" data-bind="visible: settings.plugins.octo_fire_guard.enable_data_monitoring()">
+            <label class="control-label">{{ _('Temperature Data Timeout (seconds)') }}</label>
+            <div class="controls">
+                <input type="number" class="input-block-level" 
+                       data-bind="value: settings.plugins.octo_fire_guard.temperature_data_timeout"
+                       min="60" max="1800" step="30">
+                <span class="help-block octo-fire-guard-settings-help">
+                    {{ _('Time in seconds before warning if no temperature data is received. Default: 300 seconds (5 minutes)') }}
+                </span>
+            </div>
+        </div>
     </div>
 
     <div class="octo-fire-guard-settings-section">
