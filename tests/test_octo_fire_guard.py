@@ -1370,8 +1370,9 @@ class TestTemperatureDataMonitoring(unittest.TestCase):
         args = self.plugin._plugin_manager.send_plugin_message.call_args
         message_data = args[0][1]
         self.assertIn("hotend", message_data["sensors"])
-        # Heatbed should NOT be warned about since we never received data from it.
-        # Some printers don't have heatbeds, so missing heatbed data is acceptable.
+        # Heatbed should NOT be warned about since we never received data
+        # from it. Some printers don't have heatbeds, so missing heatbed
+        # data is acceptable.
         self.assertNotIn("heatbed", message_data["sensors"])
 
 
