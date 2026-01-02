@@ -24,6 +24,7 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
         self._last_hotend_data_time = None
         self._last_heatbed_data_time = None
         self._data_timeout_warning_sent = False
+        self._warned_missing_sensors = set()  # Track which sensors we've warned about
         self._monitoring_timer = None
         self._startup_time = time.time()
 
@@ -125,15 +126,21 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
             time_since_heatbed = current_time - self._last_heatbed_data_time
             if time_since_heatbed > timeout:
                 missing_sensors.append("heatbed")
+        elif current_time - self._startup_time > timeout:
+            # If we're operational but never got heatbed data after startup timeout, that's a problem
+            # Note: Not all printers have heatbeds, so this might be expected behavior
+            missing_sensors.append("heatbed")
         
-        # Send warning if we have missing sensors and haven't already warned
+        # Send warning if we have missing sensors and haven't already warned about them
         if missing_sensors and not self._data_timeout_warning_sent:
             self._send_data_timeout_warning(missing_sensors, timeout)
             self._data_timeout_warning_sent = True
+            self._warned_missing_sensors = set(missing_sensors)
         elif not missing_sensors and self._data_timeout_warning_sent:
-            # Clear warning state if data has resumed
-            self._logger.info("Temperature data has resumed")
+            # Clear warning state if all data has resumed
+            self._logger.info("Temperature data has resumed for all sensors")
             self._data_timeout_warning_sent = False
+            self._warned_missing_sensors.clear()
 
     def _send_data_timeout_warning(self, missing_sensors, timeout):
         """Send a warning notification about missing temperature data"""
@@ -201,10 +208,13 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
                     # Update last data time if we got valid temperature data
                     if current_temp is not None:
                         self._last_hotend_data_time = current_time
-                        # Clear warning state if we were in timeout
-                        if self._data_timeout_warning_sent:
-                            self._data_timeout_warning_sent = False
+                        # Remove hotend from warned sensors if it was warned about
+                        if "hotend" in self._warned_missing_sensors:
+                            self._warned_missing_sensors.discard("hotend")
                             self._logger.info("Hotend temperature data resumed")
+                            # If no more sensors are being warned about, clear the warning state
+                            if not self._warned_missing_sensors:
+                                self._data_timeout_warning_sent = False
                     
                     if current_temp is not None and current_temp > hotend_threshold:
                         if not self._hotend_threshold_exceeded:
@@ -227,10 +237,13 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
                 # Update last data time if we got valid temperature data
                 if current_temp is not None:
                     self._last_heatbed_data_time = current_time
-                    # Clear warning state if we were in timeout
-                    if self._data_timeout_warning_sent:
-                        self._data_timeout_warning_sent = False
+                    # Remove heatbed from warned sensors if it was warned about
+                    if "heatbed" in self._warned_missing_sensors:
+                        self._warned_missing_sensors.discard("heatbed")
                         self._logger.info("Heatbed temperature data resumed")
+                        # If no more sensors are being warned about, clear the warning state
+                        if not self._warned_missing_sensors:
+                            self._data_timeout_warning_sent = False
                 
                 if current_temp is not None and current_temp > heatbed_threshold:
                     if not self._heatbed_threshold_exceeded:

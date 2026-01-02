@@ -130,6 +130,7 @@ class TestOctoFireGuardPlugin(unittest.TestCase):
         self.assertIsNone(plugin._last_hotend_data_time)
         self.assertIsNone(plugin._last_heatbed_data_time)
         self.assertFalse(plugin._data_timeout_warning_sent)
+        self.assertEqual(plugin._warned_missing_sensors, set())
     
     def test_get_settings_defaults(self):
         """Test that default settings are correctly defined"""
@@ -757,6 +758,7 @@ class TestTemperatureDataMonitoring(unittest.TestCase):
         self.assertIsNone(plugin._last_heatbed_data_time)
         self.assertFalse(plugin._data_timeout_warning_sent)
         self.assertIsNone(plugin._monitoring_timer)
+        self.assertEqual(plugin._warned_missing_sensors, set())
     
     def test_get_settings_defaults_includes_monitoring(self):
         """Test that new settings are in defaults"""
@@ -927,27 +929,29 @@ class TestTemperatureDataMonitoring(unittest.TestCase):
     
     def test_temperature_callback_clears_warning_on_data_resume(self):
         """Test that temperature callback clears warning when data resumes"""
-        # Set warning state
+        # Set warning state for both sensors
         self.plugin._data_timeout_warning_sent = True
+        self.plugin._warned_missing_sensors = {"hotend", "heatbed"}
         
         # Receive temperature data for hotend only
         parsed_temps = {"tool0": (200.0, 210.0)}
         self.plugin.temperature_callback(None, parsed_temps)
         
-        # Warning should be cleared after first sensor data
-        self.assertFalse(self.plugin._data_timeout_warning_sent)
+        # Hotend should be removed from warned sensors, but warning state should remain
+        self.assertTrue(self.plugin._data_timeout_warning_sent)
+        self.assertEqual(self.plugin._warned_missing_sensors, {"heatbed"})
         self.plugin._logger.info.assert_any_call("Hotend temperature data resumed")
         
         # Reset for bed test
-        self.plugin._data_timeout_warning_sent = True
         self.plugin._logger.info.reset_mock()
         
         # Receive temperature data for bed
         parsed_temps = {"bed": (80.0, 90.0)}
         self.plugin.temperature_callback(None, parsed_temps)
         
-        # Warning should be cleared
+        # All sensors cleared, warning state should be cleared now
         self.assertFalse(self.plugin._data_timeout_warning_sent)
+        self.assertEqual(self.plugin._warned_missing_sensors, set())
         self.plugin._logger.info.assert_any_call("Heatbed temperature data resumed")
     
     def test_send_data_timeout_warning_message_format(self):
@@ -971,6 +975,27 @@ class TestTemperatureDataMonitoring(unittest.TestCase):
         self.assertEqual(message_data["timeout"], 300)
         self.assertIn("5 minutes", message_data["message"])
         self.assertIn("hotend and heatbed", message_data["message"])
+    
+    @patch('time.time')
+    def test_check_timeout_never_received_data_after_startup(self, mock_time):
+        """Test that timeout is detected when no data received after startup timeout"""
+        # Set startup time far in the past
+        mock_time.return_value = 1000.0
+        self.plugin._startup_time = 600.0  # 400 seconds ago
+        # Never received any data
+        self.plugin._last_hotend_data_time = None
+        self.plugin._last_heatbed_data_time = None
+        
+        self.plugin._check_temperature_data_timeout()
+        
+        # Should warn about both sensors
+        self.assertTrue(self.plugin._data_timeout_warning_sent)
+        self.plugin._plugin_manager.send_plugin_message.assert_called_once()
+        
+        args = self.plugin._plugin_manager.send_plugin_message.call_args
+        message_data = args[0][1]
+        self.assertIn("hotend", message_data["sensors"])
+        self.assertIn("heatbed", message_data["sensors"])
 
 
 if __name__ == '__main__':
