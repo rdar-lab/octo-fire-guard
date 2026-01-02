@@ -34,6 +34,9 @@ class FakeOctoprint:
         
         class ShutdownPlugin:
             pass
+        
+        class EventHandlerPlugin:
+            pass
     
     class util:
         class RepeatedTimer:
@@ -1374,6 +1377,136 @@ class TestTemperatureDataMonitoring(unittest.TestCase):
         # from it. Some printers don't have heatbeds, so missing heatbed
         # data is acceptable.
         self.assertNotIn("heatbed", message_data["sensors"])
+
+
+class TestPrinterReconnection(unittest.TestCase):
+    """Test suite for printer reconnection handling"""
+    
+    def setUp(self):
+        """Set up test fixtures before each test"""
+        self.plugin = OctoFireGuardPlugin()
+        
+        # Mock the logger
+        self.plugin._logger = Mock()
+        
+        # Mock the settings
+        self.plugin._settings = Mock()
+        
+        # Mock the plugin manager
+        self.plugin._plugin_manager = Mock()
+        
+        # Mock the printer
+        self.plugin._printer = Mock()
+        
+        # Mock the identifier
+        self.plugin._identifier = "octo_fire_guard"
+    
+    def test_reset_state_clears_all_variables(self):
+        """Test that _reset_state clears all local variables"""
+        import time
+        
+        # Set all variables to non-default values
+        self.plugin._hotend_threshold_exceeded = True
+        self.plugin._heatbed_threshold_exceeded = True
+        self.plugin._last_temperatures = {"tool0": (200.0, 210.0)}
+        self.plugin._last_hotend_data_time = time.time()
+        self.plugin._last_heatbed_data_time = time.time()
+        self.plugin._data_timeout_warning_sent = True
+        self.plugin._warned_missing_sensors = {"hotend", "heatbed"}
+        
+        # Call reset
+        self.plugin._reset_state()
+        
+        # Verify all variables are reset
+        self.assertFalse(self.plugin._hotend_threshold_exceeded)
+        self.assertFalse(self.plugin._heatbed_threshold_exceeded)
+        self.assertEqual(self.plugin._last_temperatures, {})
+        self.assertIsNone(self.plugin._last_hotend_data_time)
+        self.assertIsNone(self.plugin._last_heatbed_data_time)
+        self.assertFalse(self.plugin._data_timeout_warning_sent)
+        self.assertEqual(self.plugin._warned_missing_sensors, set())
+    
+    def test_on_event_connected_triggers_reset(self):
+        """Test that Connected event triggers state reset"""
+        # Set some state
+        self.plugin._hotend_threshold_exceeded = True
+        self.plugin._heatbed_threshold_exceeded = True
+        
+        # Call on_event with Connected event
+        self.plugin.on_event("Connected", {})
+        
+        # Verify state was reset
+        self.assertFalse(self.plugin._hotend_threshold_exceeded)
+        self.assertFalse(self.plugin._heatbed_threshold_exceeded)
+        
+        # Verify logging
+        self.plugin._logger.info.assert_called_with("Printer connected, resetting plugin state")
+        self.plugin._logger.debug.assert_called_with("Plugin state reset complete")
+    
+    def test_on_event_other_events_ignored(self):
+        """Test that other events don't trigger reset"""
+        # Set some state
+        self.plugin._hotend_threshold_exceeded = True
+        
+        # Call on_event with other events
+        self.plugin.on_event("Disconnected", {})
+        self.plugin.on_event("PrintStarted", {})
+        self.plugin.on_event("PrintDone", {})
+        
+        # Verify state was not reset
+        self.assertTrue(self.plugin._hotend_threshold_exceeded)
+        
+        # Verify no reset logging
+        self.plugin._logger.info.assert_not_called()
+    
+    def test_reset_state_thread_safe(self):
+        """Test that _reset_state is thread-safe"""
+        import threading
+        
+        # Set some state
+        self.plugin._hotend_threshold_exceeded = True
+        
+        # Call reset from multiple threads
+        threads = []
+        for _ in range(10):
+            t = threading.Thread(target=self.plugin._reset_state)
+            threads.append(t)
+            t.start()
+        
+        for t in threads:
+            t.join()
+        
+        # Verify state is still properly reset
+        self.assertFalse(self.plugin._hotend_threshold_exceeded)
+        self.assertEqual(self.plugin._last_temperatures, {})
+    
+    def test_reset_after_threshold_exceeded_scenario(self):
+        """Test complete scenario: threshold exceeded, then reconnection"""
+        # Set up mocks
+        self.plugin._settings = Mock()
+        self.plugin._settings.get = Mock(return_value=250.0)
+        self.plugin._settings.get_boolean = Mock(return_value=True)
+        self.plugin._settings.get_float = Mock(return_value=250.0)
+        
+        # Simulate threshold exceeded
+        self.plugin._hotend_threshold_exceeded = True
+        self.plugin._heatbed_threshold_exceeded = True
+        self.plugin._last_temperatures = {"tool0": (260.0, 250.0)}
+        
+        # Simulate printer reconnection
+        self.plugin.on_event("Connected", {})
+        
+        # Verify all flags are reset
+        self.assertFalse(self.plugin._hotend_threshold_exceeded)
+        self.assertFalse(self.plugin._heatbed_threshold_exceeded)
+        self.assertEqual(self.plugin._last_temperatures, {})
+        
+        # Now simulate receiving new temperature data after reconnection
+        parsed_temps = {"tool0": (200.0, 210.0), "bed": (80.0, 90.0)}
+        self.plugin.temperature_callback(None, parsed_temps)
+        
+        # Should not trigger alert for safe temperatures
+        self.plugin._plugin_manager.send_plugin_message.assert_not_called()
 
 
 if __name__ == '__main__':

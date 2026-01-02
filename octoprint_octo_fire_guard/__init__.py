@@ -16,7 +16,8 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
                           octoprint.plugin.TemplatePlugin,
                           octoprint.plugin.StartupPlugin,
                           octoprint.plugin.SimpleApiPlugin,
-                          octoprint.plugin.ShutdownPlugin):
+                          octoprint.plugin.ShutdownPlugin,
+                          octoprint.plugin.EventHandlerPlugin):
 
     def __init__(self):
         self._hotend_threshold_exceeded = False
@@ -84,6 +85,28 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
     def on_shutdown(self):
         """Clean up timer on shutdown"""
         self._stop_monitoring_timer()
+
+    ##~~ EventHandlerPlugin mixin
+
+    def on_event(self, event, payload):
+        """Handle OctoPrint events"""
+        if event == "Connected":
+            self._logger.info("Printer connected, resetting plugin state")
+            self._reset_state()
+
+    def _reset_state(self):
+        """Reset all local state variables to their initial values"""
+        with self._state_lock:
+            self._hotend_threshold_exceeded = False
+            self._heatbed_threshold_exceeded = False
+            self._last_temperatures = {}
+            self._last_hotend_data_time = None
+            self._last_heatbed_data_time = None
+            self._data_timeout_warning_sent = False
+            self._warned_missing_sensors.clear()
+            # Reset startup time on reconnection so timeout logic uses the new reference point
+            self._startup_time = time.time()
+        self._logger.debug("Plugin state reset complete")
 
     def _start_monitoring_timer(self):
         """Start the background monitoring timer"""
