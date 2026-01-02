@@ -4,9 +4,11 @@
 
 An OctoPrint plugin that monitors printer temperatures in real-time to prevent fire hazards. The plugin watches both hotend and heatbed temperatures and triggers emergency shutdown procedures when configurable thresholds are exceeded.
 
+## Motivation
+
 You must ask yourself why?
 
-Well, I had an incident that the external mosfet failed in a closed-circuit mode. That meant that the temperature kept raising with nothing on the printer firmware that can stop it, nothing! only shuting down the power supply (PSU) to the printer can prevent fire in that case. I decided to hook the printer to a smart switch and install PSU control to allow the power to be cut off automatically on that case.
+Well, I had an incident where the external MOSFET failed in a closed-circuit mode. That meant that the temperature kept raising with nothing on the printer firmware that can stop it, nothing! Only shutting down the power supply (PSU) to the printer can prevent fire in that case. I decided to hook the printer to a smart switch and install PSU control to allow the power to be cut off automatically in that case.
 
 ## Features
 
