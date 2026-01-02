@@ -83,7 +83,12 @@ Integrates with the [PSU Control plugin](https://plugins.octoprint.org/plugins/p
 
 ## Testing
 
-Use the "Test Alert System" button in the settings to verify that alerts display correctly without triggering an actual emergency.
+The plugin provides two test buttons in the settings panel to verify functionality:
+
+- **Test Alert System**: Tests the alert popup display without triggering emergency actions. This verifies that the visual alert, audio notification, and user interface components work correctly.
+- **Test Emergency Actions**: Tests the actual emergency response by executing your configured termination commands (GCode or PSU control). Use this to verify that your emergency shutdown procedure works correctly before an actual emergency occurs.
+
+**Important**: The "Test Emergency Actions" button will execute the real emergency shutdown commands configured in your termination settings. Make sure your printer is in a safe state before testing.
 
 ## Safety Considerations
 
