@@ -47,7 +47,8 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
 
     def get_template_configs(self):
         return [
-            dict(type="settings", custom_bindings=False)
+            dict(type="settings", custom_bindings=False),
+            dict(type="generic", template="octo_fire_guard_alert_modal.jinja2", custom_bindings=False)
         ]
 
     ##~~ StartupPlugin mixin

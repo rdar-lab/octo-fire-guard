@@ -42,24 +42,9 @@ $(function() {
             }
         };
 
-        // Manual binding for compatibility with UI Customizer and other DOM-modifying plugins
+        // Manual setup in onAfterBinding for UI elements that need special handling
         self.onAfterBinding = function() {
             try {
-                // Bind the alert modal manually if it hasn't been bound yet
-                var alertModal = document.getElementById("octo_fire_guard_alert_modal");
-                if (alertModal) {
-                    var existingBinding = ko.dataFor(alertModal);
-                    // Only bind if not already bound to this viewModel instance
-                    if (!existingBinding || existingBinding !== self) {
-                        try {
-                            ko.applyBindings(self, alertModal);
-                        } catch (e) {
-                            // If binding fails (e.g., already bound), log but don't break functionality
-                            console.error("Octo Fire Guard: Could not bind alert modal", e);
-                        }
-                    }
-                }
-
                 // Attach event listener to test alert button
                 var testButton = document.getElementById("octo-fire-guard-test-alert-btn");
                 if (testButton) {
@@ -138,12 +123,12 @@ $(function() {
         };
     }
 
-    // Register the view model with empty elements array to avoid binding conflicts
-    // The alert modal is bound manually in onAfterBinding for UI Customizer compatibility
+    // Register the view model with the alert modal element for binding
+    // The modal is in a separate generic template to avoid binding conflicts with SettingsViewModel
     // The test alert button uses a direct event listener to avoid Knockout binding context issues
     OCTOPRINT_VIEWMODELS.push({
         construct: OctoFireGuardViewModel,
         dependencies: ["settingsViewModel"],
-        elements: []
+        elements: ["#octo_fire_guard_alert_modal"]
     });
 });
