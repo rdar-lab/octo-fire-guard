@@ -15,6 +15,14 @@ An OctoPrint plugin that monitors printer temperatures in real-time to prevent f
 - **User-Friendly Interface**: Easy-to-use settings panel with test functionality
 - **Audio Alerts**: Plays an alert sound when temperature threshold is exceeded
 
+## Installation
+
+Install via the bundled [Plugin Manager](https://docs.octoprint.org/en/master/bundledplugins/pluginmanager.html) or manually using this URL:
+
+```
+https://github.com/rdar-lab/octo-fire-guard/archive/main.zip
+```
+
 ## Plugin Interface
 
 ### Settings Panel
@@ -28,14 +36,6 @@ The plugin provides an intuitive settings panel in OctoPrint where you can confi
 When a temperature threshold is exceeded, a prominent alert modal appears with critical information:
 
 ![Temperature Alert Modal](screenshots/alert-modal.png)
-
-## Installation
-
-Install via the bundled [Plugin Manager](https://docs.octoprint.org/en/master/bundledplugins/pluginmanager.html) or manually using this URL:
-
-```
-https://github.com/rdar-lab/octo-fire-guard/archive/main.zip
-```
 
 ## Configuration
 
