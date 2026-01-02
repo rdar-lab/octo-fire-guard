@@ -16,6 +16,14 @@ An OctoPrint plugin that monitors printer temperatures in real-time to prevent f
 - **User-Friendly Interface**: Easy-to-use settings panel with test functionality
 - **Audio Alerts**: Plays an alert sound when temperature threshold is exceeded
 
+## Installation
+
+Install via the bundled [Plugin Manager](https://docs.octoprint.org/en/master/bundledplugins/pluginmanager.html) or manually using this URL:
+
+```
+https://github.com/rdar-lab/octo-fire-guard/archive/main.zip
+```
+
 ## Plugin Interface
 
 ### Settings Panel
@@ -29,14 +37,6 @@ The plugin provides an intuitive settings panel in OctoPrint where you can confi
 When a temperature threshold is exceeded, a prominent alert modal appears with critical information:
 
 ![Temperature Alert Modal](screenshots/alert-modal.png)
-
-## Installation
-
-Install via the bundled [Plugin Manager](https://docs.octoprint.org/en/master/bundledplugins/pluginmanager.html) or manually using this URL:
-
-```
-https://github.com/rdar-lab/octo-fire-guard/archive/main.zip
-```
 
 ## Configuration
 
@@ -103,7 +103,12 @@ Integrates with the [PSU Control plugin](https://plugins.octoprint.org/plugins/p
 
 ## Testing
 
-Use the "Test Alert System" button in the settings to verify that alerts display correctly without triggering an actual emergency.
+The plugin provides two test buttons in the settings panel to verify functionality:
+
+- **Test Alert System**: Tests the alert popup display without triggering emergency actions. This verifies that the visual alert, audio notification, and user interface components work correctly.
+- **Test Emergency Actions**: Tests the actual emergency response by executing your configured termination commands (GCode or PSU control). Use this to verify that your emergency shutdown procedure works correctly before an actual emergency occurs.
+
+**Important**: The "Test Emergency Actions" button will execute the real emergency shutdown commands configured in your termination settings. Make sure your printer is in a safe state before testing.
 
 ## Safety Considerations
 

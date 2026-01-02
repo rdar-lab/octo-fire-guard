@@ -61,6 +61,19 @@ $(function() {
                         }
                     });
                 }
+                
+                // Attach event listener to test emergency actions button
+                var testEmergencyButton = document.getElementById("octo-fire-guard-test-emergency-btn");
+                if (testEmergencyButton) {
+                    testEmergencyButton.addEventListener("click", function(e) {
+                        e.preventDefault();
+                        try {
+                            self.testEmergencyActions();
+                        } catch (err) {
+                            console.error("Octo Fire Guard: Error calling testEmergencyActions", err);
+                        }
+                    });
+                }
             } catch (e) {
                 console.error("Octo Fire Guard: Error in onAfterBinding", e);
             }
@@ -211,6 +224,77 @@ $(function() {
                     });
             } catch (e) {
                 console.error("Octo Fire Guard: Error in testAlert", e);
+            }
+        };
+
+        // Test emergency actions functionality
+        self.testEmergencyActions = function() {
+            try {
+                // Defensive check to ensure OctoPrint API is available
+                if (typeof OctoPrint === "undefined" || !OctoPrint.simpleApiCommand) {
+                    console.error("Octo Fire Guard: OctoPrint API not available");
+                    return;
+                }
+                
+                // Confirm with the user before executing
+                if (!confirm("This will execute the configured emergency actions (GCode commands or PSU control). Are you sure you want to proceed?")) {
+                    return;
+                }
+                
+                // Show notification that test is starting
+                if (typeof PNotify !== "undefined") {
+                    new PNotify({
+                        title: "Testing Emergency Actions",
+                        text: "Executing emergency actions...",
+                        type: "info",
+                        hide: true,
+                        delay: 3000
+                    });
+                }
+                
+                OctoPrint.simpleApiCommand("octo_fire_guard", "test_emergency_actions")
+                    .done(function(response) {
+                        console.log("Test emergency actions completed:", response);
+                        
+                        // Show success notification
+                        if (typeof PNotify !== "undefined") {
+                            var message = "Emergency actions test completed successfully";
+                            if (response.mode) {
+                                message += " (" + response.mode + " mode)";
+                            }
+                            if (response.message) {
+                                message += ": " + response.message;
+                            }
+                            
+                            new PNotify({
+                                title: "Test Successful",
+                                text: message,
+                                type: "success",
+                                hide: true,
+                                delay: 5000
+                            });
+                        }
+                    })
+                    .fail(function(xhr, status, error) {
+                        console.error("Failed to test emergency actions:", status, error);
+                        
+                        // Show error notification
+                        if (typeof PNotify !== "undefined") {
+                            var errorMsg = "Failed to test emergency actions";
+                            if (xhr.responseJSON && xhr.responseJSON.error) {
+                                errorMsg += ": " + xhr.responseJSON.error;
+                            }
+                            
+                            new PNotify({
+                                title: "Test Failed",
+                                text: errorMsg,
+                                type: "error",
+                                hide: false
+                            });
+                        }
+                    });
+            } catch (e) {
+                console.error("Octo Fire Guard: Error in testEmergencyActions", e);
             }
         };
     }
