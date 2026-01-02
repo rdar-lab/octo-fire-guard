@@ -104,6 +104,8 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
             self._last_heatbed_data_time = None
             self._data_timeout_warning_sent = False
             self._warned_missing_sensors.clear()
+            # Reset startup time on reconnection so timeout logic uses the new reference point
+            self._startup_time = time.time()
         self._logger.debug("Plugin state reset complete")
 
     def _start_monitoring_timer(self):
