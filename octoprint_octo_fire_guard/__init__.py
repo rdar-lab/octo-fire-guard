@@ -70,10 +70,13 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
         self._logger.info("Hotend threshold: {}°C".format(self._settings.get(["hotend_threshold"])))
         self._logger.info("Heatbed threshold: {}°C".format(self._settings.get(["heatbed_threshold"])))
         self._logger.info("Termination mode: {}".format(self._settings.get(["termination_mode"])))
+        self._logger.debug("Monitoring enabled: {}".format(self._settings.get_boolean(["enable_monitoring"])))
         
         # Start background monitoring timer if data monitoring is enabled
         if self._settings.get_boolean(["enable_data_monitoring"]):
             self._start_monitoring_timer()
+
+        self._logger.debug("Plugin initialization complete")
 
     def on_shutdown(self):
         """Clean up timer on shutdown"""
@@ -162,8 +165,6 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
                 message=message
             )
         )
-        self._logger.debug("Monitoring enabled: {}".format(self._settings.get_boolean(["enable_monitoring"])))
-        self._logger.debug("Plugin initialization complete")
 
     ##~~ SimpleApiPlugin mixin
 
