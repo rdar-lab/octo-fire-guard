@@ -81,6 +81,13 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
             )
             return flask.jsonify(success=True)
 
+    def is_api_protected(self):
+        """
+        Explicitly declare API protection status.
+        Returns True to require authentication for API commands.
+        """
+        return True
+
     ##~~ Temperature callback
 
     def temperature_callback(self, comm, parsed_temperatures):
