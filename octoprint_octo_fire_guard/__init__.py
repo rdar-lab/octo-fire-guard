@@ -27,7 +27,7 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
         self._data_timeout_warning_sent = False
         self._warned_missing_sensors = set()  # Track which sensors we've warned about
         self._monitoring_timer = None
-        self._startup_time = None  # Will be set in on_after_startup
+        self._startup_time = time.time()  # Initial startup time; may be updated in on_after_startup
         self._state_lock = threading.RLock()  # Protect shared state from race conditions
 
     ##~~ SettingsPlugin mixin
