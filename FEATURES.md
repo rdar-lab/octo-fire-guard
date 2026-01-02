@@ -163,10 +163,6 @@ octo-fire-guard/
 
 (Not implemented, but possible extensions)
 - Per-tool threshold configuration
-- Temperature trend analysis
-- Email/SMS notifications
-- Temperature logging to file
 - Customizable alert sounds
 - Multi-language support
 - Integration with other notification plugins
-- Temperature history graphs
