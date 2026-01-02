@@ -63,7 +63,8 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
 
     def get_api_commands(self):
         return dict(
-            test_alert=[]
+            test_alert=[],
+            test_emergency_actions=[]
         )
 
     def on_api_command(self, command, data):
@@ -80,6 +81,25 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
                 )
             )
             return flask.jsonify(success=True)
+        elif command == "test_emergency_actions":
+            self._logger.info("Testing emergency actions")
+            termination_mode = self._settings.get(["termination_mode"])
+            
+            try:
+                if termination_mode == "gcode":
+                    self._logger.info("Testing GCode termination commands")
+                    self._execute_gcode_termination()
+                    return flask.jsonify(success=True, mode="gcode", message="GCode commands executed successfully")
+                elif termination_mode == "psu":
+                    self._logger.info("Testing PSU termination")
+                    self._execute_psu_termination()
+                    return flask.jsonify(success=True, mode="psu", message="PSU termination executed successfully")
+                else:
+                    self._logger.error("Unknown termination mode: {}".format(termination_mode))
+                    return flask.jsonify(success=False, error="Unknown termination mode"), 400
+            except Exception as e:
+                self._logger.error("Error testing emergency actions: {}".format(str(e)))
+                return flask.jsonify(success=False, error=str(e)), 500
 
     ##~~ Temperature callback
 

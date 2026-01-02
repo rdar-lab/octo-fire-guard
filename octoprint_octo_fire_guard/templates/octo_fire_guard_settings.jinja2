@@ -90,5 +90,14 @@
         <span class="help-block octo-fire-guard-settings-help">
             {{ _('Click to test the alert popup without triggering an actual emergency.') }}
         </span>
+        
+        <br><br>
+        
+        <button class="btn btn-danger" id="octo-fire-guard-test-emergency-btn">
+            <i class="fa fa-bolt"></i> {{ _('Test Emergency Actions') }}
+        </button>
+        <span class="help-block octo-fire-guard-settings-help">
+            {{ _('Click to test the emergency actions (GCode commands or PSU control). This will actually execute the configured termination commands!') }}
+        </span>
     </div>
 </div>

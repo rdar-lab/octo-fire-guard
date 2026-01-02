@@ -164,6 +164,8 @@ class TestOctoFireGuardPlugin(unittest.TestCase):
         
         self.assertIn("test_alert", commands)
         self.assertEqual(commands["test_alert"], [])
+        self.assertIn("test_emergency_actions", commands)
+        self.assertEqual(commands["test_emergency_actions"], [])
     
     @patch('flask.jsonify')
     def test_on_api_command_test_alert(self, mock_jsonify):
@@ -188,6 +190,60 @@ class TestOctoFireGuardPlugin(unittest.TestCase):
         self.assertIn("test alert", message_data["message"].lower())
         
         mock_jsonify.assert_called_once_with(success=True)
+    
+    @patch('flask.jsonify')
+    def test_on_api_command_test_emergency_actions_gcode(self, mock_jsonify):
+        """Test that test_emergency_actions API command works in GCode mode"""
+        mock_jsonify.return_value = {"success": True, "mode": "gcode"}
+        
+        result = self.plugin.on_api_command("test_emergency_actions", {})
+        
+        # Verify logger was called
+        self.plugin._logger.info.assert_any_call("Testing emergency actions")
+        self.plugin._logger.info.assert_any_call("Testing GCode termination commands")
+        
+        # Verify GCode commands were sent
+        self.plugin._printer.commands.assert_called()
+        self.assertEqual(self.plugin._printer.commands.call_count, 3)
+        
+        mock_jsonify.assert_called_once_with(success=True, mode="gcode", message="GCode commands executed successfully")
+    
+    @patch('flask.jsonify')
+    def test_on_api_command_test_emergency_actions_psu(self, mock_jsonify):
+        """Test that test_emergency_actions API command works in PSU mode"""
+        self.settings_dict["termination_mode"] = "psu"
+        mock_jsonify.return_value = {"success": True, "mode": "psu"}
+        
+        # Mock PSU plugin
+        mock_psu_plugin = Mock()
+        mock_psu_implementation = Mock()
+        mock_psu_implementation.turn_psu_off = Mock()
+        mock_psu_plugin.implementation = mock_psu_implementation
+        self.plugin._plugin_manager.get_plugin_info.return_value = mock_psu_plugin
+        
+        result = self.plugin.on_api_command("test_emergency_actions", {})
+        
+        # Verify logger was called
+        self.plugin._logger.info.assert_any_call("Testing emergency actions")
+        self.plugin._logger.info.assert_any_call("Testing PSU termination")
+        
+        # Verify PSU plugin was called
+        mock_psu_implementation.turn_psu_off.assert_called_once()
+        
+        mock_jsonify.assert_called_once_with(success=True, mode="psu", message="PSU termination executed successfully")
+    
+    @patch('flask.jsonify')
+    def test_on_api_command_test_emergency_actions_unknown_mode(self, mock_jsonify):
+        """Test that test_emergency_actions handles unknown termination mode"""
+        self.settings_dict["termination_mode"] = "invalid_mode"
+        mock_jsonify.return_value = ({"success": False, "error": "Unknown termination mode"}, 400)
+        
+        result = self.plugin.on_api_command("test_emergency_actions", {})
+        
+        # Verify error was logged
+        self.plugin._logger.error.assert_any_call("Unknown termination mode: invalid_mode")
+        
+        mock_jsonify.assert_called_once_with(success=False, error="Unknown termination mode")
     
     # ===== Temperature Callback Tests =====
     
