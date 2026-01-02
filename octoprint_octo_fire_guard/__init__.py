@@ -54,10 +54,13 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
     ##~~ StartupPlugin mixin
 
     def on_after_startup(self):
+        self._logger.debug("Initializing Octo Fire Guard plugin")
         self._logger.info("Octo Fire Guard plugin started")
         self._logger.info("Hotend threshold: {}°C".format(self._settings.get(["hotend_threshold"])))
         self._logger.info("Heatbed threshold: {}°C".format(self._settings.get(["heatbed_threshold"])))
         self._logger.info("Termination mode: {}".format(self._settings.get(["termination_mode"])))
+        self._logger.debug("Monitoring enabled: {}".format(self._settings.get_boolean(["enable_monitoring"])))
+        self._logger.debug("Plugin initialization complete")
 
     ##~~ SimpleApiPlugin mixin
 
@@ -104,6 +107,13 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
                 return flask.jsonify(success=False, error="Failed to execute emergency actions. Check the logs for details."), 500
 
 
+    def is_api_protected(self):
+        """
+        Explicitly declare API protection status.
+        Returns True to require authentication for API commands.
+        """
+        return True
+
     ##~~ Temperature callback
 
     def temperature_callback(self, comm, parsed_temperatures):
@@ -111,20 +121,35 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
         Called when temperature data is received from the printer.
         This is where we monitor temperatures and trigger alerts.
         """
+        self._logger.debug("temperature_callback invoked - processing temperature data")
+        
         if not self._settings.get_boolean(["enable_monitoring"]):
+            self._logger.debug("Monitoring is disabled, skipping temperature checks")
             return parsed_temperatures
 
+        self._logger.debug("Monitoring is enabled, checking temperatures")
+        self._logger.debug("Received parsed_temperatures: {}".format(parsed_temperatures))
+        
         hotend_threshold = self._settings.get_float(["hotend_threshold"])
         heatbed_threshold = self._settings.get_float(["heatbed_threshold"])
+        self._logger.debug("Current thresholds - Hotend: {}°C, Heatbed: {}°C".format(
+            hotend_threshold, heatbed_threshold
+        ))
 
         # Check hotend temperature (tool0, tool1, etc.)
         for tool_key in parsed_temperatures:
             if tool_key.startswith("tool"):
+                self._logger.debug("Checking hotend temperature for {}".format(tool_key))
                 temp_data = parsed_temperatures[tool_key]
                 if isinstance(temp_data, tuple) and len(temp_data) >= 2:
                     current_temp = temp_data[0]
+                    self._logger.debug("{} current temperature: {}°C".format(tool_key, current_temp))
                     if current_temp is not None and current_temp > hotend_threshold:
+                        self._logger.debug("{} temperature {} exceeds threshold {}".format(
+                            tool_key, current_temp, hotend_threshold
+                        ))
                         if not self._hotend_threshold_exceeded:
+                            self._logger.debug("Hotend threshold flag not yet set, triggering alert")
                             self._logger.warning(
                                 "HOTEND TEMPERATURE ALERT! Current: {}°C, Threshold: {}°C".format(
                                     current_temp, hotend_threshold
@@ -132,17 +157,31 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
                             )
                             self._trigger_emergency_shutdown("hotend", current_temp, hotend_threshold)
                             self._hotend_threshold_exceeded = True
+                            self._logger.debug("Hotend threshold exceeded flag set to True")
+                        else:
+                            self._logger.debug("Hotend threshold already exceeded, skipping duplicate alert")
                     elif current_temp is not None and current_temp <= hotend_threshold - 10:
                         # Reset flag if temperature drops significantly below threshold
-                        self._hotend_threshold_exceeded = False
+                        if self._hotend_threshold_exceeded:
+                            self._logger.debug("Hotend temperature dropped to {}°C, resetting threshold flag".format(
+                                current_temp
+                            ))
+                            self._hotend_threshold_exceeded = False
+                            self._logger.debug("Hotend threshold exceeded flag reset to False")
 
         # Check heatbed temperature
         if "bed" in parsed_temperatures:
+            self._logger.debug("Checking heatbed temperature")
             temp_data = parsed_temperatures["bed"]
             if isinstance(temp_data, tuple) and len(temp_data) >= 2:
                 current_temp = temp_data[0]
+                self._logger.debug("Heatbed current temperature: {}°C".format(current_temp))
                 if current_temp is not None and current_temp > heatbed_threshold:
+                    self._logger.debug("Heatbed temperature {} exceeds threshold {}".format(
+                        current_temp, heatbed_threshold
+                    ))
                     if not self._heatbed_threshold_exceeded:
+                        self._logger.debug("Heatbed threshold flag not yet set, triggering alert")
                         self._logger.warning(
                             "HEATBED TEMPERATURE ALERT! Current: {}°C, Threshold: {}°C".format(
                                 current_temp, heatbed_threshold
@@ -150,16 +189,28 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
                         )
                         self._trigger_emergency_shutdown("heatbed", current_temp, heatbed_threshold)
                         self._heatbed_threshold_exceeded = True
+                        self._logger.debug("Heatbed threshold exceeded flag set to True")
+                    else:
+                        self._logger.debug("Heatbed threshold already exceeded, skipping duplicate alert")
                 elif current_temp is not None and current_temp <= heatbed_threshold - 10:
                     # Reset flag if temperature drops significantly below threshold
-                    self._heatbed_threshold_exceeded = False
+                    if self._heatbed_threshold_exceeded:
+                        self._logger.debug("Heatbed temperature dropped to {}°C, resetting threshold flag".format(
+                            current_temp
+                        ))
+                        self._heatbed_threshold_exceeded = False
+                        self._logger.debug("Heatbed threshold exceeded flag reset to False")
 
+        self._logger.debug("temperature_callback complete, returning parsed_temperatures")
         return parsed_temperatures
 
     def _trigger_emergency_shutdown(self, sensor_type, current_temp, threshold):
         """
         Trigger emergency shutdown when temperature threshold is exceeded.
         """
+        self._logger.debug("_trigger_emergency_shutdown called for {} - temp: {}, threshold: {}".format(
+            sensor_type, current_temp, threshold
+        ))
         self._logger.error(
             "EMERGENCY SHUTDOWN TRIGGERED! {} temperature {} exceeded threshold {}".format(
                 sensor_type.upper(), current_temp, threshold
@@ -167,6 +218,7 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
         )
 
         # Send alert to frontend
+        self._logger.debug("Sending temperature alert to frontend")
         self._plugin_manager.send_plugin_message(
             self._identifier,
             dict(
@@ -182,6 +234,7 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
 
         # Execute termination command
         termination_mode = self._settings.get(["termination_mode"])
+        self._logger.debug("Executing termination mode: {}".format(termination_mode))
 
         if termination_mode == "gcode":
             self._execute_gcode_termination()
@@ -195,33 +248,40 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
         Execute GCode termination commands.
         """
         termination_gcode = self._settings.get(["termination_gcode"])
+        self._logger.debug("_execute_gcode_termination called")
         self._logger.info("Executing GCode termination: {}".format(termination_gcode))
 
         # Split by newlines and send each command
         if termination_gcode:
             commands = termination_gcode.split("\n")
+            self._logger.debug("Termination GCode split into {} commands".format(len(commands)))
             for command in commands:
                 command = command.strip()
                 if command:
                     self._logger.info("Sending emergency GCode: {}".format(command))
                     self._printer.commands(command)
+        self._logger.debug("GCode termination complete")
 
     def _execute_psu_termination(self):
         """
         Execute PSU control termination (turn off power).
         """
         psu_plugin_name = self._settings.get(["psu_plugin_name"])
+        self._logger.debug("_execute_psu_termination called")
         self._logger.info("Attempting to turn off PSU via plugin: {}".format(psu_plugin_name))
 
         # Try to send turn off command via PSU control plugin
         try:
             # First, try to turn off heaters with GCode
+            self._logger.debug("Turning off heaters before PSU shutdown")
             self._printer.commands("M104 S0")  # Turn off hotend
             self._printer.commands("M140 S0")  # Turn off bed
 
             # Try to access PSU control plugin and call its turn_psu_off method
+            self._logger.debug("Looking up PSU plugin: {}".format(psu_plugin_name))
             psu_plugin = self._plugin_manager.get_plugin_info(psu_plugin_name)
             if psu_plugin and psu_plugin.implementation:
+                self._logger.debug("PSU plugin found, checking for turn off methods")
                 # Try different methods that PSU control plugins might use
                 if hasattr(psu_plugin.implementation, 'turn_psu_off'):
                     self._logger.info("Calling turn_psu_off method")
@@ -243,6 +303,8 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
             # Fallback to GCode termination
             self._logger.warning("Falling back to GCode termination")
             self._execute_gcode_termination()
+        
+        self._logger.debug("PSU termination process complete")
 
     ##~~ Softwareupdate hook
 

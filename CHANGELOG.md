@@ -57,6 +57,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Implemented `onAfterBinding` lifecycle hook for manual Knockout.js binding of alert modal
     - Enhanced error handling in API command failures with more descriptive error messages
 
+- **OctoPrint 1.11.2+ Compatibility**: Explicitly declared API protection status
+  - Added `is_api_protected()` method to SimpleApiPlugin implementation
+  - Returns `True` to require authentication for API commands (specifically `test_alert`)
+  - Resolves warning about default implementation of `is_api_protected` that will change in future OctoPrint versions
+  - Ensures secure API access by explicitly requiring user authentication
+
 ### Potential Future Enhancements
 - Per-tool threshold configuration
 - Temperature trend analysis
