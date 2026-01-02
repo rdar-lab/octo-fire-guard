@@ -6,17 +6,6 @@ import flask
 
 __plugin_name__ = "Octo Fire Guard"
 __plugin_pythoncompat__ = ">=2.7,<4"
-__plugin_implementation__ = None
-
-
-def __plugin_load__():
-    global __plugin_implementation__
-    __plugin_implementation__ = OctoFireGuardPlugin()
-
-    global __plugin_hooks__
-    __plugin_hooks__ = {
-        "octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information
-    }
 
 
 class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
