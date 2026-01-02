@@ -1,5 +1,7 @@
 # Octo Fire Guard
 
+[![Unit Tests](https://github.com/rdar-lab/octo-fire-guard/actions/workflows/tests.yml/badge.svg)](https://github.com/rdar-lab/octo-fire-guard/actions/workflows/tests.yml)
+
 An OctoPrint plugin that monitors printer temperatures in real-time to prevent fire hazards. The plugin watches both hotend and heatbed temperatures and triggers emergency shutdown procedures when configurable thresholds are exceeded.
 
 ## Features
