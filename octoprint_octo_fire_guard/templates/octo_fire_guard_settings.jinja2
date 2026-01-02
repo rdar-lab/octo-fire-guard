@@ -84,42 +84,11 @@
 
     <div class="octo-fire-guard-settings-section">
         <h4>{{ _('Testing') }}</h4>
-        <button class="btn btn-warning octo-fire-guard-test-button" data-bind="click: testAlert">
+        <button class="btn btn-warning" id="octo-fire-guard-test-alert-btn">
             <i class="fa fa-exclamation-triangle"></i> {{ _('Test Alert System') }}
         </button>
         <span class="help-block octo-fire-guard-settings-help">
             {{ _('Click to test the alert popup without triggering an actual emergency.') }}
         </span>
-    </div>
-</div>
-
-<!-- Alert Modal -->
-<div id="octo_fire_guard_alert_modal" class="modal hide fade" tabindex="-1" role="dialog" 
-     data-bind="css: { critical: isAlertVisible }, visible: isAlertVisible" style="display: none;">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fa fa-fire"></i> {{ _('TEMPERATURE ALERT!') }}</h3>
-            </div>
-            <div class="modal-body">
-                <div class="alert-message">
-                    <strong data-bind="text: alertMessage"></strong>
-                </div>
-                <div class="alert-details">
-                    <div><strong>{{ _('Sensor:') }}</strong> <span data-bind="text: alertSensor"></span></div>
-                    <div><strong>{{ _('Current Temp:') }}</strong> <span data-bind="text: alertCurrentTemp().toFixed(1)"></span>°C</div>
-                    <div><strong>{{ _('Threshold:') }}</strong> <span data-bind="text: alertThreshold().toFixed(1)"></span>°C</div>
-                </div>
-                <p>
-                    <strong>{{ _('Emergency shutdown has been triggered!') }}</strong><br>
-                    {{ _('Please check your printer immediately!') }}
-                </p>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-danger btn-block" data-bind="click: closeAlert">
-                    <i class="fa fa-check"></i> {{ _('I UNDERSTAND - Close Alert') }}
-                </button>
-            </div>
-        </div>
     </div>
 </div>

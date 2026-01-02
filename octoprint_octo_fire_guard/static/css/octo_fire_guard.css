@@ -1,11 +1,9 @@
 /* Octo Fire Guard CSS */
 
-#octo_fire_guard_alert_modal .modal-dialog {
+#octo_fire_guard_alert_modal {
     width: 600px;
     max-width: 90%;
-}
-
-#octo_fire_guard_alert_modal .modal-content {
+    margin-left: -300px; /* Half of width for centering */
     border: 5px solid #d9534f;
     background-color: #f2dede;
 }

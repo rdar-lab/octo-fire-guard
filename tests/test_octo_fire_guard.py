@@ -145,9 +145,16 @@ class TestOctoFireGuardPlugin(unittest.TestCase):
         """Test that template configuration is set"""
         configs = self.plugin.get_template_configs()
         
-        self.assertEqual(len(configs), 1)
+        self.assertEqual(len(configs), 2)
+        
+        # Check settings template
         self.assertEqual(configs[0]["type"], "settings")
         self.assertFalse(configs[0]["custom_bindings"])
+        
+        # Check generic template (alert modal)
+        self.assertEqual(configs[1]["type"], "generic")
+        self.assertEqual(configs[1]["template"], "octo_fire_guard_alert_modal.jinja2")
+        self.assertFalse(configs[1]["custom_bindings"])
     
     # ===== API Command Tests =====
     

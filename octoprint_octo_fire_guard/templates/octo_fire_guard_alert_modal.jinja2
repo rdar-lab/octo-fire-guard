@@ -1,0 +1,26 @@
+<!-- Alert Modal -->
+<div id="octo_fire_guard_alert_modal" class="modal hide fade" tabindex="-1" role="dialog" 
+     data-bind="css: { critical: isAlertVisible }">
+    <div class="modal-header">
+        <h3><i class="fa fa-fire"></i> {{ _('TEMPERATURE ALERT!') }}</h3>
+    </div>
+    <div class="modal-body">
+        <div class="alert-message">
+            <strong data-bind="text: alertMessage"></strong>
+        </div>
+        <div class="alert-details">
+            <div><strong>{{ _('Sensor:') }}</strong> <span data-bind="text: alertSensor"></span></div>
+            <div><strong>{{ _('Current Temp:') }}</strong> <span data-bind="text: alertCurrentTemp().toFixed(1)"></span>°C</div>
+            <div><strong>{{ _('Threshold:') }}</strong> <span data-bind="text: alertThreshold().toFixed(1)"></span>°C</div>
+        </div>
+        <p>
+            <strong>{{ _('Emergency shutdown has been triggered!') }}</strong><br>
+            {{ _('Please check your printer immediately!') }}
+        </p>
+    </div>
+    <div class="modal-footer">
+        <button class="btn btn-danger btn-block" data-bind="click: closeAlert">
+            <i class="fa fa-check"></i> {{ _('I UNDERSTAND - Close Alert') }}
+        </button>
+    </div>
+</div>
