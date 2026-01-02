@@ -113,9 +113,13 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
             hotend_threshold, heatbed_threshold
         ))
 
-        # Check hotend temperature (tool0, tool1, etc.)
+        # Check hotend temperature (tool0, tool1, etc. or T0, T1, etc.)
         for tool_key in parsed_temperatures:
-            if tool_key.startswith("tool"):
+            # Support both old format (tool0, tool1) and new format (T0, T1)
+            # For new format: starts with 'T', has at least one more character, and all chars after 'T' are digits
+            is_new_format_tool = (tool_key.startswith("T") and len(tool_key) >= 2 and 
+                                  tool_key[1:].isdigit())
+            if tool_key.startswith("tool") or is_new_format_tool:
                 self._logger.debug("Checking hotend temperature for {}".format(tool_key))
                 temp_data = parsed_temperatures[tool_key]
                 if isinstance(temp_data, tuple) and len(temp_data) >= 2:
@@ -146,10 +150,16 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
                             self._hotend_threshold_exceeded = False
                             self._logger.debug("Hotend threshold exceeded flag reset to False")
 
-        # Check heatbed temperature
+        # Check heatbed temperature (support both "bed" and "B" formats)
+        bed_key = None
         if "bed" in parsed_temperatures:
+            bed_key = "bed"
+        elif "B" in parsed_temperatures:
+            bed_key = "B"
+        
+        if bed_key:
             self._logger.debug("Checking heatbed temperature")
-            temp_data = parsed_temperatures["bed"]
+            temp_data = parsed_temperatures[bed_key]
             if isinstance(temp_data, tuple) and len(temp_data) >= 2:
                 current_temp = temp_data[0]
                 self._logger.debug("Heatbed current temperature: {}°C".format(current_temp))
