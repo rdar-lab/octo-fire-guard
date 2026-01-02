@@ -404,14 +404,11 @@ class TestOctoFireGuardPlugin(unittest.TestCase):
     
     def test_execute_psu_termination_alternative_method(self):
         """Test PSU termination with alternative method name"""
-        # Mock PSU plugin with turnPSUOff method
+        # Mock PSU plugin with turnPSUOff method only
         mock_psu_plugin = Mock()
-        mock_psu_implementation = Mock()
+        mock_psu_implementation = Mock(spec=['turnPSUOff'])
         mock_psu_implementation.turnPSUOff = Mock()
         mock_psu_plugin.implementation = mock_psu_implementation
-        
-        # Remove turn_psu_off attribute
-        del mock_psu_implementation.turn_psu_off
         
         self.plugin._plugin_manager.get_plugin_info.return_value = mock_psu_plugin
         
@@ -438,7 +435,7 @@ class TestOctoFireGuardPlugin(unittest.TestCase):
         """Test PSU termination falls back when no turn off method exists"""
         # Mock PSU plugin without turn off methods
         mock_psu_plugin = Mock()
-        mock_psu_implementation = Mock(spec=[])  # No methods
+        mock_psu_implementation = Mock(spec=object)  # No methods
         mock_psu_plugin.implementation = mock_psu_implementation
         
         self.plugin._plugin_manager.get_plugin_info.return_value = mock_psu_plugin
@@ -490,8 +487,8 @@ class TestOctoFireGuardPlugin(unittest.TestCase):
         self.plugin._trigger_emergency_shutdown("hotend", 260.0, 250.0)
         
         # Should log error about unknown mode
-        error_calls = [str(call) for call in self.plugin._logger.error.call_args_list]
-        self.assertTrue(any("Unknown termination mode" in str(call) for call in error_calls))
+        # Check that error was logged with the expected message
+        self.plugin._logger.error.assert_any_call("Unknown termination mode: unknown")
     
     # ===== Update Information Tests =====
     
