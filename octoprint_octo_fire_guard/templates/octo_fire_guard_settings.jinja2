@@ -1,0 +1,125 @@
+<div class="octo-fire-guard-settings">
+    <h3>{{ _('Octo Fire Guard Settings') }}</h3>
+    
+    <div class="octo-fire-guard-settings-section">
+        <h4>{{ _('Monitoring Settings') }}</h4>
+        
+        <div class="control-group">
+            <label class="checkbox">
+                <input type="checkbox" data-bind="checked: settings.plugins.octo_fire_guard.enable_monitoring">
+                {{ _('Enable temperature monitoring') }}
+            </label>
+            <span class="help-block octo-fire-guard-settings-help">
+                {{ _('When enabled, the plugin will monitor temperatures and trigger alerts when thresholds are exceeded.') }}
+            </span>
+        </div>
+    </div>
+
+    <div class="octo-fire-guard-settings-section">
+        <h4>{{ _('Temperature Thresholds') }}</h4>
+        
+        <div class="control-group">
+            <label class="control-label">{{ _('Hotend Threshold (°C)') }}</label>
+            <div class="controls">
+                <input type="number" class="input-block-level" 
+                       data-bind="value: settings.plugins.octo_fire_guard.hotend_threshold"
+                       min="0" max="500" step="1">
+                <span class="help-block octo-fire-guard-settings-help">
+                    {{ _('Maximum safe temperature for the hotend. Alert will trigger if exceeded. Default: 250°C') }}
+                </span>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <label class="control-label">{{ _('Heatbed Threshold (°C)') }}</label>
+            <div class="controls">
+                <input type="number" class="input-block-level" 
+                       data-bind="value: settings.plugins.octo_fire_guard.heatbed_threshold"
+                       min="0" max="200" step="1">
+                <span class="help-block octo-fire-guard-settings-help">
+                    {{ _('Maximum safe temperature for the heatbed. Alert will trigger if exceeded. Default: 100°C') }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="octo-fire-guard-settings-section">
+        <h4>{{ _('Termination Settings') }}</h4>
+        
+        <div class="control-group">
+            <label class="control-label">{{ _('Termination Mode') }}</label>
+            <div class="controls">
+                <select class="input-block-level" data-bind="value: settings.plugins.octo_fire_guard.termination_mode">
+                    <option value="gcode">{{ _('GCode Commands') }}</option>
+                    <option value="psu">{{ _('PSU Control (Power Off)') }}</option>
+                </select>
+                <span class="help-block octo-fire-guard-settings-help">
+                    {{ _('Choose how to respond when temperature threshold is exceeded.') }}
+                </span>
+            </div>
+        </div>
+        
+        <div class="control-group" data-bind="visible: settings.plugins.octo_fire_guard.termination_mode() === 'gcode'">
+            <label class="control-label">{{ _('Termination GCode') }}</label>
+            <div class="controls">
+                <textarea class="input-block-level" rows="5"
+                          data-bind="value: settings.plugins.octo_fire_guard.termination_gcode"></textarea>
+                <span class="help-block octo-fire-guard-settings-help">
+                    {{ _('GCode commands to execute on emergency shutdown. One command per line. Default includes M112 (emergency stop) and commands to turn off heaters.') }}
+                </span>
+            </div>
+        </div>
+        
+        <div class="control-group" data-bind="visible: settings.plugins.octo_fire_guard.termination_mode() === 'psu'">
+            <label class="control-label">{{ _('PSU Plugin Name') }}</label>
+            <div class="controls">
+                <input type="text" class="input-block-level" 
+                       data-bind="value: settings.plugins.octo_fire_guard.psu_plugin_name">
+                <span class="help-block octo-fire-guard-settings-help">
+                    {{ _('Name of the PSU Control plugin (usually "psucontrol"). The plugin will attempt to turn off power through this plugin.') }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="octo-fire-guard-settings-section">
+        <h4>{{ _('Testing') }}</h4>
+        <button class="btn btn-warning octo-fire-guard-test-button" data-bind="click: testAlert">
+            <i class="fa fa-exclamation-triangle"></i> {{ _('Test Alert System') }}
+        </button>
+        <span class="help-block octo-fire-guard-settings-help">
+            {{ _('Click to test the alert popup without triggering an actual emergency.') }}
+        </span>
+    </div>
+</div>
+
+<!-- Alert Modal -->
+<div id="octo_fire_guard_alert_modal" class="modal hide fade" tabindex="-1" role="dialog" 
+     data-bind="css: { critical: isAlertVisible }, visible: isAlertVisible" style="display: none;">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fa fa-fire"></i> {{ _('TEMPERATURE ALERT!') }}</h3>
+            </div>
+            <div class="modal-body">
+                <div class="alert-message">
+                    <strong data-bind="text: alertMessage"></strong>
+                </div>
+                <div class="alert-details">
+                    <div><strong>{{ _('Sensor:') }}</strong> <span data-bind="text: alertSensor"></span></div>
+                    <div><strong>{{ _('Current Temp:') }}</strong> <span data-bind="text: alertCurrentTemp().toFixed(1)"></span>°C</div>
+                    <div><strong>{{ _('Threshold:') }}</strong> <span data-bind="text: alertThreshold().toFixed(1)"></span>°C</div>
+                </div>
+                <p>
+                    <strong>{{ _('Emergency shutdown has been triggered!') }}</strong><br>
+                    {{ _('Please check your printer immediately!') }}
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger btn-block" data-bind="click: closeAlert">
+                    <i class="fa fa-check"></i> {{ _('I UNDERSTAND - Close Alert') }}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

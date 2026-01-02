@@ -1,0 +1,5 @@
+include README.md
+include LICENSE
+recursive-include octoprint_octo_fire_guard/templates *
+recursive-include octoprint_octo_fire_guard/static *
+recursive-include octoprint_octo_fire_guard/translations *
