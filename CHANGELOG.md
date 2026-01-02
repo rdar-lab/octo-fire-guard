@@ -65,10 +65,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Potential Future Enhancements
 - Per-tool threshold configuration
-- Temperature trend analysis
-- Email/SMS notification integration
-- Historical temperature logging
 - Custom alert sound uploads
 - Multi-language support
 - Integration with additional notification plugins
-- Temperature history visualization
