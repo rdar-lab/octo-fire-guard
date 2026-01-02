@@ -1,0 +1,89 @@
+/* Octo Fire Guard CSS */
+
+#octo_fire_guard_alert_modal .modal-dialog {
+    width: 600px;
+    max-width: 90%;
+}
+
+#octo_fire_guard_alert_modal .modal-content {
+    border: 5px solid #d9534f;
+    background-color: #f2dede;
+}
+
+#octo_fire_guard_alert_modal .modal-header {
+    background-color: #d9534f;
+    color: white;
+    padding: 20px;
+    border-bottom: none;
+}
+
+#octo_fire_guard_alert_modal .modal-header h3 {
+    margin: 0;
+    font-size: 28px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+#octo_fire_guard_alert_modal .modal-body {
+    padding: 30px;
+    font-size: 18px;
+    color: #a94442;
+}
+
+#octo_fire_guard_alert_modal .alert-details {
+    margin: 20px 0;
+    padding: 15px;
+    background-color: white;
+    border: 2px solid #d9534f;
+    border-radius: 5px;
+}
+
+#octo_fire_guard_alert_modal .alert-details strong {
+    display: inline-block;
+    width: 150px;
+}
+
+#octo_fire_guard_alert_modal .modal-footer {
+    padding: 20px;
+    background-color: #ebcccc;
+}
+
+#octo_fire_guard_alert_modal .btn-danger {
+    font-size: 18px;
+    padding: 10px 30px;
+    font-weight: bold;
+}
+
+.octo-fire-guard-settings-section {
+    margin-bottom: 20px;
+}
+
+.octo-fire-guard-settings-section h4 {
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #eee;
+}
+
+.octo-fire-guard-settings-help {
+    color: #666;
+    font-size: 0.9em;
+    margin-top: 5px;
+}
+
+.octo-fire-guard-test-button {
+    margin-top: 10px;
+}
+
+/* Blinking animation for alert */
+@keyframes blink-alert {
+    0%, 49% {
+        background-color: #f2dede;
+    }
+    50%, 100% {
+        background-color: #d9534f;
+    }
+}
+
+#octo_fire_guard_alert_modal.critical .modal-header {
+    animation: blink-alert 1s linear infinite;
+}

@@ -1,0 +1,252 @@
+# coding=utf-8
+from __future__ import absolute_import
+
+import octoprint.plugin
+import flask
+
+__plugin_name__ = "Octo Fire Guard"
+__plugin_pythoncompat__ = ">=2.7,<4"
+__plugin_implementation__ = None
+
+
+def __plugin_load__():
+    global __plugin_implementation__
+    __plugin_implementation__ = OctoFireGuardPlugin()
+
+    global __plugin_hooks__
+    __plugin_hooks__ = {
+        "octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information
+    }
+
+
+class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
+                          octoprint.plugin.AssetPlugin,
+                          octoprint.plugin.TemplatePlugin,
+                          octoprint.plugin.StartupPlugin,
+                          octoprint.plugin.SimpleApiPlugin):
+
+    def __init__(self):
+        self._hotend_threshold_exceeded = False
+        self._heatbed_threshold_exceeded = False
+        self._last_temperatures = {}
+
+    ##~~ SettingsPlugin mixin
+
+    def get_settings_defaults(self):
+        return dict(
+            hotend_threshold=250,  # Default hotend threshold in °C
+            heatbed_threshold=100,  # Default heatbed threshold in °C
+            termination_mode="gcode",  # Options: "gcode" or "psu"
+            termination_gcode="M112\nM104 S0\nM140 S0",  # Emergency stop + turn off heaters
+            psu_plugin_name="psucontrol",  # Name of PSU control plugin
+            enable_monitoring=True,  # Enable/disable monitoring
+            check_interval=1  # Check interval in seconds (not currently used, uses temperature callback)
+        )
+
+    def get_settings_version(self):
+        return 1
+
+    ##~~ AssetPlugin mixin
+
+    def get_assets(self):
+        return dict(
+            js=["js/octo_fire_guard.js"],
+            css=["css/octo_fire_guard.css"]
+        )
+
+    ##~~ TemplatePlugin mixin
+
+    def get_template_configs(self):
+        return [
+            dict(type="settings", custom_bindings=False)
+        ]
+
+    ##~~ StartupPlugin mixin
+
+    def on_after_startup(self):
+        self._logger.info("Octo Fire Guard plugin started")
+        self._logger.info("Hotend threshold: {}°C".format(self._settings.get(["hotend_threshold"])))
+        self._logger.info("Heatbed threshold: {}°C".format(self._settings.get(["heatbed_threshold"])))
+        self._logger.info("Termination mode: {}".format(self._settings.get(["termination_mode"])))
+
+    ##~~ SimpleApiPlugin mixin
+
+    def get_api_commands(self):
+        return dict(
+            test_alert=[]
+        )
+
+    def on_api_command(self, command, data):
+        if command == "test_alert":
+            self._logger.info("Testing alert system")
+            self._plugin_manager.send_plugin_message(
+                self._identifier,
+                dict(
+                    type="temperature_alert",
+                    sensor="test",
+                    current_temp=999,
+                    threshold=250,
+                    message="This is a test alert"
+                )
+            )
+            return flask.jsonify(success=True)
+
+    ##~~ Temperature callback
+
+    def temperature_callback(self, comm, parsed_temperatures):
+        """
+        Called when temperature data is received from the printer.
+        This is where we monitor temperatures and trigger alerts.
+        """
+        if not self._settings.get_boolean(["enable_monitoring"]):
+            return parsed_temperatures
+
+        hotend_threshold = self._settings.get_float(["hotend_threshold"])
+        heatbed_threshold = self._settings.get_float(["heatbed_threshold"])
+
+        # Check hotend temperature (tool0, tool1, etc.)
+        for tool_key in parsed_temperatures:
+            if tool_key.startswith("tool"):
+                temp_data = parsed_temperatures[tool_key]
+                if isinstance(temp_data, tuple) and len(temp_data) >= 2:
+                    current_temp = temp_data[0]
+                    if current_temp is not None and current_temp > hotend_threshold:
+                        if not self._hotend_threshold_exceeded:
+                            self._logger.warning(
+                                "HOTEND TEMPERATURE ALERT! Current: {}°C, Threshold: {}°C".format(
+                                    current_temp, hotend_threshold
+                                )
+                            )
+                            self._trigger_emergency_shutdown("hotend", current_temp, hotend_threshold)
+                            self._hotend_threshold_exceeded = True
+                    elif current_temp is not None and current_temp <= hotend_threshold - 10:
+                        # Reset flag if temperature drops significantly below threshold
+                        self._hotend_threshold_exceeded = False
+
+        # Check heatbed temperature
+        if "bed" in parsed_temperatures:
+            temp_data = parsed_temperatures["bed"]
+            if isinstance(temp_data, tuple) and len(temp_data) >= 2:
+                current_temp = temp_data[0]
+                if current_temp is not None and current_temp > heatbed_threshold:
+                    if not self._heatbed_threshold_exceeded:
+                        self._logger.warning(
+                            "HEATBED TEMPERATURE ALERT! Current: {}°C, Threshold: {}°C".format(
+                                current_temp, heatbed_threshold
+                            )
+                        )
+                        self._trigger_emergency_shutdown("heatbed", current_temp, heatbed_threshold)
+                        self._heatbed_threshold_exceeded = True
+                elif current_temp is not None and current_temp <= heatbed_threshold - 10:
+                    # Reset flag if temperature drops significantly below threshold
+                    self._heatbed_threshold_exceeded = False
+
+        return parsed_temperatures
+
+    def _trigger_emergency_shutdown(self, sensor_type, current_temp, threshold):
+        """
+        Trigger emergency shutdown when temperature threshold is exceeded.
+        """
+        self._logger.error(
+            "EMERGENCY SHUTDOWN TRIGGERED! {} temperature {} exceeded threshold {}".format(
+                sensor_type.upper(), current_temp, threshold
+            )
+        )
+
+        # Send alert to frontend
+        self._plugin_manager.send_plugin_message(
+            self._identifier,
+            dict(
+                type="temperature_alert",
+                sensor=sensor_type,
+                current_temp=current_temp,
+                threshold=threshold,
+                message="EMERGENCY: {} temperature ({:.1f}°C) exceeded threshold ({:.1f}°C)!".format(
+                    sensor_type.upper(), current_temp, threshold
+                )
+            )
+        )
+
+        # Execute termination command
+        termination_mode = self._settings.get(["termination_mode"])
+
+        if termination_mode == "gcode":
+            self._execute_gcode_termination()
+        elif termination_mode == "psu":
+            self._execute_psu_termination()
+        else:
+            self._logger.error("Unknown termination mode: {}".format(termination_mode))
+
+    def _execute_gcode_termination(self):
+        """
+        Execute GCode termination commands.
+        """
+        termination_gcode = self._settings.get(["termination_gcode"])
+        self._logger.info("Executing GCode termination: {}".format(termination_gcode))
+
+        # Split by newlines and send each command
+        if termination_gcode:
+            commands = termination_gcode.split("\n")
+            for command in commands:
+                command = command.strip()
+                if command:
+                    self._logger.info("Sending emergency GCode: {}".format(command))
+                    self._printer.commands(command)
+
+    def _execute_psu_termination(self):
+        """
+        Execute PSU control termination (turn off power).
+        """
+        psu_plugin_name = self._settings.get(["psu_plugin_name"])
+        self._logger.info("Attempting to turn off PSU via plugin: {}".format(psu_plugin_name))
+
+        # Try to send turn off command via PSU control plugin
+        try:
+            # First, try to turn off heaters with GCode
+            self._printer.commands("M104 S0")  # Turn off hotend
+            self._printer.commands("M140 S0")  # Turn off bed
+
+            # Then send message to PSU control plugin
+            self._plugin_manager.send_plugin_message(
+                psu_plugin_name,
+                dict(command="turnPSUOff")
+            )
+            self._logger.info("PSU shutdown command sent")
+        except Exception as e:
+            self._logger.error("Failed to execute PSU termination: {}".format(str(e)))
+            # Fallback to GCode termination
+            self._logger.warning("Falling back to GCode termination")
+            self._execute_gcode_termination()
+
+    ##~~ Softwareupdate hook
+
+    def get_update_information(self):
+        return dict(
+            octo_fire_guard=dict(
+                displayName="Octo Fire Guard",
+                displayVersion=self._plugin_version,
+
+                # version check: github repository
+                type="github_release",
+                user="rdar-lab",
+                repo="octo-fire-guard",
+                current=self._plugin_version,
+
+                # update method: pip
+                pip="https://github.com/rdar-lab/octo-fire-guard/archive/{target_version}.zip"
+            )
+        )
+
+
+__plugin_implementation__ = OctoFireGuardPlugin()
+
+
+def __plugin_load__():
+    global __plugin_implementation__
+    __plugin_implementation__ = OctoFireGuardPlugin()
+
+    global __plugin_hooks__
+    __plugin_hooks__ = {
+        "octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information,
+        "octoprint.comm.protocol.temperatures.received": __plugin_implementation__.temperature_callback
+    }
