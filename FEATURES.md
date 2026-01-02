@@ -1,7 +1,7 @@
 # Plugin Features Summary
 
 ## Overview
-Octo Fire Guard is a safety plugin for OctoPrint that monitors temperature sensors in real-time and triggers emergency shutdown when thresholds are exceeded.
+Octo Fire Guard is a safety plugin for OctoPrint that monitors temperature sensors in real-time and triggers emergency shutdown when thresholds are exceeded. It also includes self-test monitoring to ensure the plugin is functioning correctly.
 
 ## Key Components
 
@@ -10,6 +10,8 @@ Located in: **OctoPrint Settings → Plugins → Octo Fire Guard**
 
 Features:
 - Enable/disable monitoring checkbox
+- Enable/disable self-test monitoring checkbox
+- Temperature data timeout setting
 - Hotend threshold input (°C)
 - Heatbed threshold input (°C)
 - Termination mode selector (GCode or PSU Control)
@@ -23,8 +25,17 @@ Features:
 - Monitors all hotend tools (tool0, tool1, etc.)
 - Monitors heatbed temperature
 - Cooldown logic prevents alert spam (10°C hysteresis)
+- Tracks last received data timestamp for self-test monitoring
 
-### 3. Alert System
+### 3. Self-Test Monitoring
+- Background timer checks every 30 seconds for temperature data
+- Detects if printer is connected but no data received
+- Configurable timeout period (default: 5 minutes)
+- Issues warning notification when timeout occurs
+- Automatically clears warning when data resumes
+- Only monitors when printer is operational
+
+### 4. Alert System
 When threshold exceeded:
 - **Large Modal Popup**: Red-themed, prominent alert
 - **Alert Content**:
@@ -38,7 +49,12 @@ When threshold exceeded:
 - **Blinking Animation**: Visual attention grabber
 - **Acknowledgment Required**: User must click to dismiss
 
-### 4. Emergency Shutdown
+When self-test detects missing data:
+- **Warning Notification**: Yellow-themed notification
+- **Content**: Information about missing sensors and timeout period
+- **Non-intrusive**: Doesn't block UI but remains visible
+
+### 5. Emergency Shutdown
 **GCode Mode** (Default):
 - Sends M112 (emergency stop)
 - Sends M104 S0 (turn off hotend)

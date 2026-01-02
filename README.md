@@ -7,6 +7,7 @@ An OctoPrint plugin that monitors printer temperatures in real-time to prevent f
 ## Features
 
 - **Real-time Temperature Monitoring**: Continuously monitors hotend and heatbed temperatures via OctoPrint's temperature data stream
+- **Self-Test Monitoring**: Automatically detects if temperature data stops arriving and issues warnings
 - **Dual Threshold Configuration**: Separate configurable thresholds for hotend (default: 250°C) and heatbed (default: 100°C)
 - **Immediate Alert System**: Displays a prominent alert popup in the OctoPrint interface when thresholds are exceeded
 - **Flexible Emergency Response**: Choose between two termination modes:
@@ -46,6 +47,13 @@ After installation, configure the plugin in OctoPrint Settings → Plugins → O
 - **Hotend Threshold**: Maximum safe temperature for the hotend in °C (default: 250°C)
 - **Heatbed Threshold**: Maximum safe temperature for the heatbed in °C (default: 100°C)
 
+### Self-Test Monitoring
+
+- **Enable Self-Test Monitoring**: When enabled, the plugin monitors itself to ensure it's receiving temperature data from the printer
+- **Temperature Data Timeout**: Time in seconds before issuing a warning if no temperature data is received (default: 300 seconds / 5 minutes)
+
+If the printer is connected but the plugin doesn't receive temperature data for the configured timeout period, it will issue a warning notification. This helps ensure the plugin is functioning correctly and actively monitoring your printer.
+
 ### Termination Mode
 
 Choose how the plugin responds when a threshold is exceeded:
@@ -69,10 +77,13 @@ Integrates with the [PSU Control plugin](https://plugins.octoprint.org/plugins/p
 
 ## How It Works
 
+### Temperature Monitoring
+
 1. The plugin subscribes to OctoPrint's temperature callback system
 2. Every time temperature data is received from the printer:
    - Checks if any hotend temperature exceeds the configured threshold
    - Checks if the heatbed temperature exceeds the configured threshold
+   - Records the timestamp of received data for self-test monitoring
 3. When a threshold is exceeded:
    - Logs a warning message
    - Displays a prominent alert popup in the OctoPrint UI
@@ -80,6 +91,15 @@ Integrates with the [PSU Control plugin](https://plugins.octoprint.org/plugins/p
    - Executes the configured termination commands
 4. The alert remains until the user acknowledges it
 5. Temperature monitoring continues, with a cooldown period to prevent repeated alerts
+
+### Self-Test Monitoring
+
+1. A background timer checks every 30 seconds if temperature data is being received
+2. If the printer is connected but no temperature data has been received for the configured timeout period:
+   - Issues a warning notification to the OctoPrint notification center
+   - Logs a warning message
+3. The warning state clears automatically when temperature data resumes
+4. This ensures the plugin is actively monitoring and hasn't stopped receiving data
 
 ## Testing
 
@@ -128,12 +148,13 @@ octo-fire-guard/
 ### Key Components
 
 - **Temperature Monitoring**: Uses OctoPrint's `octoprint.comm.protocol.temperatures.received` hook
+- **Self-Test Monitoring**: Uses `octoprint.util.RepeatedTimer` for background monitoring
 - **Alert System**: Sends plugin messages to the frontend for display
 - **Emergency Response**: Executes termination commands via printer commands or plugin messages
 
 ### Testing
 
-The plugin includes a comprehensive test suite with **38 unit tests** covering all major functionality.
+The plugin includes a comprehensive test suite with **53 unit tests** covering all major functionality including the new self-test monitoring feature.
 
 To run the tests:
 
