@@ -59,6 +59,15 @@ $(function() {
                         }
                     }
                 }
+
+                // Attach event listener to test alert button
+                var testButton = document.getElementById("octo-fire-guard-test-alert-btn");
+                if (testButton) {
+                    testButton.addEventListener("click", function(e) {
+                        e.preventDefault();
+                        self.testAlert();
+                    });
+                }
             } catch (e) {
                 console.error("Octo Fire Guard: Error in onAfterBinding", e);
             }
@@ -125,12 +134,12 @@ $(function() {
         };
     }
 
-    // Register the view model
-    // Include settings panel for automatic binding, but alert modal is bound manually in onAfterBinding
-    // to avoid conflicts with UI Customizer and other DOM-modifying plugins
+    // Register the view model with empty elements array to avoid binding conflicts
+    // The alert modal is bound manually in onAfterBinding for UI Customizer compatibility
+    // The test alert button uses a direct event listener to avoid Knockout binding context issues
     OCTOPRINT_VIEWMODELS.push({
         construct: OctoFireGuardViewModel,
         dependencies: ["settingsViewModel"],
-        elements: ["#settings_plugin_octo_fire_guard"]
+        elements: []
     });
 });
