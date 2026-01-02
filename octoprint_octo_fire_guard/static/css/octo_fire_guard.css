@@ -4,9 +4,6 @@
     width: 600px;
     max-width: 90%;
     margin-left: -300px; /* Half of width for centering */
-}
-
-#octo_fire_guard_alert_modal {
     border: 5px solid #d9534f;
     background-color: #f2dede;
 }
