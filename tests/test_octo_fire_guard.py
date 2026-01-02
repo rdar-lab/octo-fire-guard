@@ -212,6 +212,13 @@ class TestOctoFireGuardPlugin(unittest.TestCase):
         
         mock_jsonify.assert_called_once_with(success=True)
     
+    def test_is_api_protected(self):
+        """Test that API protection is explicitly declared"""
+        is_protected = self.plugin.is_api_protected()
+        
+        # API should be protected (require authentication)
+        self.assertTrue(is_protected)
+    
     # ===== Temperature Callback Tests =====
     
     def test_temperature_callback_monitoring_disabled(self):
@@ -592,6 +599,282 @@ class TestOctoFireGuardPlugin(unittest.TestCase):
         # Commands should be stripped
         calls = [call("M112"), call("M104 S0")]
         self.plugin._printer.commands.assert_has_calls(calls)
+    
+    # ===== New Temperature Format Tests (OctoPrint uppercase keys) =====
+    
+    def test_temperature_callback_new_format_safe_temperatures(self):
+        """Test that safe temperatures with new format (T0, B) don't trigger alerts"""
+        parsed_temps = {"T0": (200.0, 210.0), "B": (80.0, 90.0)}
+        result = self.plugin.temperature_callback(None, parsed_temps)
+        
+        # Should return temperatures unchanged
+        self.assertEqual(result, parsed_temps)
+        
+        # Should not trigger any emergency
+        self.plugin._plugin_manager.send_plugin_message.assert_not_called()
+        self.assertFalse(self.plugin._hotend_threshold_exceeded)
+        self.assertFalse(self.plugin._heatbed_threshold_exceeded)
+    
+    def test_temperature_callback_new_format_hotend_threshold_exceeded(self):
+        """Test that hotend threshold exceeded with new format (T0) triggers emergency"""
+        parsed_temps = {"T0": (260.0, 250.0), "B": (80.0, 90.0)}
+        result = self.plugin.temperature_callback(None, parsed_temps)
+        
+        # Should return temperatures unchanged
+        self.assertEqual(result, parsed_temps)
+        
+        # Should trigger emergency
+        self.assertTrue(self.plugin._hotend_threshold_exceeded)
+        self.plugin._logger.warning.assert_called()
+        self.plugin._logger.error.assert_called()
+        self.plugin._plugin_manager.send_plugin_message.assert_called()
+        
+        # Verify the alert message
+        args = self.plugin._plugin_manager.send_plugin_message.call_args
+        message_data = args[0][1]
+        self.assertEqual(message_data["type"], "temperature_alert")
+        self.assertEqual(message_data["sensor"], "hotend")
+        self.assertEqual(message_data["current_temp"], 260.0)
+        self.assertEqual(message_data["threshold"], 250.0)
+    
+    def test_temperature_callback_new_format_heatbed_threshold_exceeded(self):
+        """Test that heatbed threshold exceeded with new format (B) triggers emergency"""
+        parsed_temps = {"T0": (200.0, 210.0), "B": (110.0, 100.0)}
+        result = self.plugin.temperature_callback(None, parsed_temps)
+        
+        # Should return temperatures unchanged
+        self.assertEqual(result, parsed_temps)
+        
+        # Should trigger emergency
+        self.assertTrue(self.plugin._heatbed_threshold_exceeded)
+        self.plugin._logger.warning.assert_called()
+        self.plugin._logger.error.assert_called()
+        self.plugin._plugin_manager.send_plugin_message.assert_called()
+        
+        # Verify the alert message
+        args = self.plugin._plugin_manager.send_plugin_message.call_args
+        message_data = args[0][1]
+        self.assertEqual(message_data["type"], "temperature_alert")
+        self.assertEqual(message_data["sensor"], "heatbed")
+        self.assertEqual(message_data["current_temp"], 110.0)
+        self.assertEqual(message_data["threshold"], 100.0)
+    
+    def test_temperature_callback_new_format_multiple_tools(self):
+        """Test monitoring with multiple hotends in new format (T0, T1)"""
+        parsed_temps = {
+            "T0": (200.0, 210.0),
+            "T1": (270.0, 250.0),  # This one exceeds threshold
+            "B": (80.0, 90.0)
+        }
+        result = self.plugin.temperature_callback(None, parsed_temps)
+        
+        # Should trigger emergency for T1
+        self.assertTrue(self.plugin._hotend_threshold_exceeded)
+        self.plugin._plugin_manager.send_plugin_message.assert_called()
+    
+    def test_temperature_callback_new_format_threshold_reset(self):
+        """Test that threshold flag resets after cooldown with new format"""
+        # First trigger the threshold
+        parsed_temps = {"T0": (260.0, 250.0), "B": (80.0, 90.0)}
+        self.plugin.temperature_callback(None, parsed_temps)
+        self.assertTrue(self.plugin._hotend_threshold_exceeded)
+        
+        # Clear the mock to check for new calls
+        self.plugin._plugin_manager.send_plugin_message.reset_mock()
+        
+        # Temperature drops below threshold minus 10 degrees
+        parsed_temps = {"T0": (239.0, 250.0), "B": (80.0, 90.0)}
+        self.plugin.temperature_callback(None, parsed_temps)
+        self.assertFalse(self.plugin._hotend_threshold_exceeded)
+        
+        # Now if it exceeds again, it should trigger
+        parsed_temps = {"T0": (260.0, 250.0), "B": (80.0, 90.0)}
+        self.plugin.temperature_callback(None, parsed_temps)
+        self.plugin._plugin_manager.send_plugin_message.assert_called()
+    
+    def test_temperature_callback_new_format_bed_threshold_reset(self):
+        """Test that bed threshold flag resets after cooldown with new format"""
+        # Trigger bed threshold
+        parsed_temps = {"T0": (200.0, 210.0), "B": (110.0, 100.0)}
+        self.plugin.temperature_callback(None, parsed_temps)
+        self.assertTrue(self.plugin._heatbed_threshold_exceeded)
+        
+        # Temperature drops below threshold minus 10
+        parsed_temps = {"T0": (200.0, 210.0), "B": (89.0, 100.0)}
+        self.plugin.temperature_callback(None, parsed_temps)
+        self.assertFalse(self.plugin._heatbed_threshold_exceeded)
+    
+    def test_temperature_callback_new_format_both_thresholds_exceeded(self):
+        """Test that both hotend and bed can exceed at the same time with new format"""
+        parsed_temps = {"T0": (260.0, 250.0), "B": (110.0, 100.0)}
+        result = self.plugin.temperature_callback(None, parsed_temps)
+        
+        # Both flags should be set
+        self.assertTrue(self.plugin._hotend_threshold_exceeded)
+        self.assertTrue(self.plugin._heatbed_threshold_exceeded)
+        
+        # Should have triggered two alerts
+        self.assertEqual(self.plugin._plugin_manager.send_plugin_message.call_count, 2)
+    
+    def test_temperature_callback_mixed_format(self):
+        """Test that plugin handles mixed old and new formats (shouldn't happen but be safe)"""
+        parsed_temps = {"T0": (200.0, 210.0), "tool1": (205.0, 215.0), "B": (80.0, 90.0)}
+        result = self.plugin.temperature_callback(None, parsed_temps)
+        
+        # Should not crash and handle both
+        self.assertEqual(result, parsed_temps)
+        self.plugin._plugin_manager.send_plugin_message.assert_not_called()
+    
+    def test_temperature_callback_invalid_tool_keys(self):
+        """Test that invalid tool keys like 'T', 'Ta', 'Tb' are not matched"""
+        # These should NOT be recognized as valid tool keys
+        parsed_temps = {"T": (200.0, 210.0), "Ta": (205.0, 215.0), "Tb": (210.0, 220.0), "B": (80.0, 90.0)}
+        result = self.plugin.temperature_callback(None, parsed_temps)
+        
+        # Should not crash, should not trigger any alerts
+        self.assertEqual(result, parsed_temps)
+        self.plugin._plugin_manager.send_plugin_message.assert_not_called()
+        self.assertFalse(self.plugin._hotend_threshold_exceeded)
+        
+        # None of the debug messages should indicate checking these as hotends
+        debug_calls = self.plugin._logger.debug.call_args_list
+        debug_strs = [str(call) for call in debug_calls]
+        self.assertFalse(any("Checking hotend temperature for T" in str(call) or 
+                            "Checking hotend temperature for Ta" in str(call) or
+                            "Checking hotend temperature for Tb" in str(call) for call in debug_strs))
+    
+    # ===== Debug Logging Tests =====
+    
+    def test_on_after_startup_debug_logging(self):
+        """Test that on_after_startup logs debug messages"""
+        self.plugin.on_after_startup()
+        
+        # Verify debug logging calls
+        debug_calls = self.plugin._logger.debug.call_args_list
+        self.assertGreater(len(debug_calls), 0)
+        
+        # Check for specific debug messages
+        self.assertTrue(any("Initializing Octo Fire Guard plugin" in str(call) for call in debug_calls))
+        self.assertTrue(any("Plugin initialization complete" in str(call) for call in debug_calls))
+        self.assertTrue(any("Monitoring enabled" in str(call) for call in debug_calls))
+    
+    def test_temperature_callback_debug_logging_enabled(self):
+        """Test that temperature_callback logs debug messages when monitoring enabled"""
+        parsed_temps = {"tool0": (200.0, 210.0), "bed": (80.0, 90.0)}
+        self.plugin.temperature_callback(None, parsed_temps)
+        
+        # Verify debug logging was called
+        debug_calls = self.plugin._logger.debug.call_args_list
+        self.assertGreater(len(debug_calls), 0)
+        
+        # Check for specific debug messages
+        self.assertTrue(any("temperature_callback invoked" in str(call) for call in debug_calls))
+        self.assertTrue(any("Monitoring is enabled" in str(call) for call in debug_calls))
+        self.assertTrue(any("parsed_temperatures" in str(call) for call in debug_calls))
+        self.assertTrue(any("Current thresholds" in str(call) for call in debug_calls))
+    
+    def test_temperature_callback_debug_logging_disabled(self):
+        """Test that temperature_callback logs when monitoring disabled"""
+        self.settings_dict["enable_monitoring"] = False
+        parsed_temps = {"tool0": (200.0, 210.0), "bed": (80.0, 90.0)}
+        self.plugin.temperature_callback(None, parsed_temps)
+        
+        # Verify debug logging was called
+        debug_calls = self.plugin._logger.debug.call_args_list
+        self.assertGreater(len(debug_calls), 0)
+        
+        # Check for disabled monitoring message
+        self.assertTrue(any("Monitoring is disabled" in str(call) for call in debug_calls))
+    
+    def test_hotend_threshold_exceeded_debug_logging(self):
+        """Test debug logging when hotend threshold exceeded"""
+        parsed_temps = {"tool0": (260.0, 250.0), "bed": (80.0, 90.0)}
+        self.plugin.temperature_callback(None, parsed_temps)
+        
+        # Verify debug logging for threshold exceeded
+        debug_calls = self.plugin._logger.debug.call_args_list
+        
+        # Check for specific debug messages
+        self.assertTrue(any("Checking hotend temperature" in str(call) for call in debug_calls))
+        self.assertTrue(any("current temperature" in str(call) for call in debug_calls))
+        self.assertTrue(any("exceeds threshold" in str(call) for call in debug_calls))
+        self.assertTrue(any("threshold flag not yet set" in str(call) for call in debug_calls))
+        self.assertTrue(any("threshold exceeded flag set to True" in str(call) for call in debug_calls))
+    
+    def test_heatbed_threshold_exceeded_debug_logging(self):
+        """Test debug logging when heatbed threshold exceeded"""
+        parsed_temps = {"tool0": (200.0, 210.0), "bed": (110.0, 100.0)}
+        self.plugin.temperature_callback(None, parsed_temps)
+        
+        # Verify debug logging for threshold exceeded
+        debug_calls = self.plugin._logger.debug.call_args_list
+        
+        # Check for specific debug messages
+        self.assertTrue(any("Checking heatbed temperature" in str(call) for call in debug_calls))
+        self.assertTrue(any("Heatbed current temperature" in str(call) for call in debug_calls))
+        self.assertTrue(any("Heatbed temperature" in str(call) and "exceeds threshold" in str(call) for call in debug_calls))
+        self.assertTrue(any("threshold exceeded flag set to True" in str(call) for call in debug_calls))
+    
+    def test_threshold_reset_debug_logging(self):
+        """Test debug logging when threshold flag is reset"""
+        # First trigger the threshold
+        parsed_temps = {"tool0": (260.0, 250.0), "bed": (110.0, 100.0)}
+        self.plugin.temperature_callback(None, parsed_temps)
+        
+        # Clear debug calls
+        self.plugin._logger.debug.reset_mock()
+        
+        # Temperature drops to reset flags
+        parsed_temps = {"tool0": (230.0, 250.0), "bed": (85.0, 100.0)}
+        self.plugin.temperature_callback(None, parsed_temps)
+        
+        # Verify debug logging for reset
+        debug_calls = self.plugin._logger.debug.call_args_list
+        
+        self.assertTrue(any("dropped to" in str(call) and "resetting threshold flag" in str(call) for call in debug_calls))
+        self.assertTrue(any("threshold exceeded flag reset to False" in str(call) for call in debug_calls))
+    
+    def test_emergency_shutdown_debug_logging(self):
+        """Test debug logging in emergency shutdown trigger"""
+        self.plugin._trigger_emergency_shutdown("hotend", 260.0, 250.0)
+        
+        # Verify debug logging
+        debug_calls = self.plugin._logger.debug.call_args_list
+        
+        self.assertTrue(any("_trigger_emergency_shutdown called" in str(call) for call in debug_calls))
+        self.assertTrue(any("Sending temperature alert to frontend" in str(call) for call in debug_calls))
+        self.assertTrue(any("Executing termination mode" in str(call) for call in debug_calls))
+    
+    def test_gcode_termination_debug_logging(self):
+        """Test debug logging in GCode termination"""
+        self.plugin._execute_gcode_termination()
+        
+        # Verify debug logging
+        debug_calls = self.plugin._logger.debug.call_args_list
+        
+        self.assertTrue(any("_execute_gcode_termination called" in str(call) for call in debug_calls))
+        self.assertTrue(any("split into" in str(call) and "commands" in str(call) for call in debug_calls))
+        self.assertTrue(any("GCode termination complete" in str(call) for call in debug_calls))
+    
+    def test_psu_termination_debug_logging(self):
+        """Test debug logging in PSU termination"""
+        # Mock PSU plugin
+        mock_psu_plugin = Mock()
+        mock_psu_implementation = Mock()
+        mock_psu_implementation.turn_psu_off = Mock()
+        mock_psu_plugin.implementation = mock_psu_implementation
+        self.plugin._plugin_manager.get_plugin_info.return_value = mock_psu_plugin
+        
+        self.plugin._execute_psu_termination()
+        
+        # Verify debug logging
+        debug_calls = self.plugin._logger.debug.call_args_list
+        
+        self.assertTrue(any("_execute_psu_termination called" in str(call) for call in debug_calls))
+        self.assertTrue(any("Turning off heaters before PSU shutdown" in str(call) for call in debug_calls))
+        self.assertTrue(any("Looking up PSU plugin" in str(call) for call in debug_calls))
+        self.assertTrue(any("PSU plugin found" in str(call) for call in debug_calls))
+        self.assertTrue(any("PSU termination process complete" in str(call) for call in debug_calls))
 
 
 class TestPluginHooks(unittest.TestCase):
