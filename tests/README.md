@@ -101,7 +101,7 @@ Integration tests that verify complete end-to-end workflows from temperature det
 
 ## Dependencies
 
-The tests require Python 3.x with the following standard library modules:
+The tests require Python 3.8 or higher with the following standard library modules:
 - `unittest` (built-in)
 - `unittest.mock` (built-in)
 - No external dependencies required!

@@ -82,7 +82,7 @@ Use the "Test Alert System" button in the settings to verify that alerts display
 ## Requirements
 
 - OctoPrint 1.4.0 or higher
-- Python 2.7 or 3.x
+- Python 3.8 or higher
 - For PSU Control mode: PSU Control plugin installed and configured
 
 ## Development

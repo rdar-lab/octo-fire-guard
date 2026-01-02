@@ -5,7 +5,7 @@ import octoprint.plugin
 import flask
 
 __plugin_name__ = "Octo Fire Guard"
-__plugin_pythoncompat__ = ">=2.7,<4"
+__plugin_pythoncompat__ = ">=3.8,<4"
 
 
 class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
