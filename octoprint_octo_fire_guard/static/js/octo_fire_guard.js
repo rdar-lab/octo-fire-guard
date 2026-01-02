@@ -42,11 +42,16 @@ $(function() {
         self.onAfterBinding = function() {
             // Bind the alert modal manually if it hasn't been bound yet
             var alertModal = document.getElementById("octo_fire_guard_alert_modal");
-            if (alertModal && !ko.dataFor(alertModal)) {
-                try {
-                    ko.applyBindings(self, alertModal);
-                } catch (e) {
-                    console.error("Octo Fire Guard: Could not bind alert modal", e);
+            if (alertModal) {
+                var existingBinding = ko.dataFor(alertModal);
+                // Only bind if not already bound to this viewModel instance
+                if (!existingBinding || existingBinding !== self) {
+                    try {
+                        ko.applyBindings(self, alertModal);
+                    } catch (e) {
+                        // If binding fails (e.g., already bound), log but don't break functionality
+                        console.error("Octo Fire Guard: Could not bind alert modal", e);
+                    }
                 }
             }
         };
@@ -104,7 +109,9 @@ $(function() {
         };
     }
 
-    // Register the view model with optional elements to avoid conflicts with UI Customizer
+    // Register the view model with empty elements array to avoid conflicts with UI Customizer
+    // OctoPrint's automatic binding will handle #settings_plugin_octo_fire_guard (settings panel)
+    // We manually bind #octo_fire_guard_alert_modal in onAfterBinding for better compatibility
     OCTOPRINT_VIEWMODELS.push({
         construct: OctoFireGuardViewModel,
         dependencies: ["settingsViewModel"],
