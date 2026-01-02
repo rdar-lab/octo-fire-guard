@@ -98,8 +98,11 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
                     self._logger.error("Unknown termination mode: {}".format(termination_mode))
                     return flask.jsonify(success=False, error="Unknown termination mode"), 400
             except Exception as e:
-                self._logger.error("Error testing emergency actions: {}".format(str(e)))
-                return flask.jsonify(success=False, error=str(e)), 500
+                # Log the full error details for troubleshooting
+                self._logger.error("Error testing emergency actions: {}".format(str(e)), exc_info=True)
+                # Return a generic error message to the client to avoid exposing sensitive information
+                return flask.jsonify(success=False, error="Failed to execute emergency actions. Check the logs for details."), 500
+
 
     ##~~ Temperature callback
 
