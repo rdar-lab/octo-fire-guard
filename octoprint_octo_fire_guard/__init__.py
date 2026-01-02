@@ -103,8 +103,7 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
             self._last_hotend_data_time = None
             self._last_heatbed_data_time = None
             self._data_timeout_warning_sent = False
-            if self._warned_missing_sensors is not None:
-                self._warned_missing_sensors.clear()
+            self._warned_missing_sensors.clear()
         self._logger.debug("Plugin state reset complete")
 
     def _start_monitoring_timer(self):
