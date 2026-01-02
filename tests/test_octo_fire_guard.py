@@ -31,6 +31,22 @@ class FakeOctoprint:
         
         class SimpleApiPlugin:
             pass
+        
+        class ShutdownPlugin:
+            pass
+    
+    class util:
+        class RepeatedTimer:
+            def __init__(self, interval, function):
+                self.interval = interval
+                self.function = function
+                self.is_running = False
+            
+            def start(self):
+                self.is_running = True
+            
+            def cancel(self):
+                self.is_running = False
 
 # Mock flask module
 class FakeFlask:
@@ -41,6 +57,7 @@ class FakeFlask:
 # Install the mocks
 sys.modules['octoprint'] = FakeOctoprint()
 sys.modules['octoprint.plugin'] = FakeOctoprint.plugin
+sys.modules['octoprint.util'] = FakeOctoprint.util
 sys.modules['flask'] = FakeFlask()
 
 # Add parent directory to path to import the plugin

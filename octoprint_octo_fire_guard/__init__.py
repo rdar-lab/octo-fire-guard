@@ -2,6 +2,7 @@
 from __future__ import absolute_import
 
 import octoprint.plugin
+import octoprint.util
 import flask
 import time
 
@@ -13,7 +14,8 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
                           octoprint.plugin.AssetPlugin,
                           octoprint.plugin.TemplatePlugin,
                           octoprint.plugin.StartupPlugin,
-                          octoprint.plugin.SimpleApiPlugin):
+                          octoprint.plugin.SimpleApiPlugin,
+                          octoprint.plugin.ShutdownPlugin):
 
     def __init__(self):
         self._hotend_threshold_exceeded = False
@@ -81,7 +83,6 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
             self._stop_monitoring_timer()
         
         # Check every 30 seconds for temperature data timeout
-        import octoprint.util
         self._monitoring_timer = octoprint.util.RepeatedTimer(30, self._check_temperature_data_timeout)
         self._monitoring_timer.start()
         self._logger.info("Temperature data monitoring timer started")
@@ -116,10 +117,9 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
             time_since_hotend = current_time - self._last_hotend_data_time
             if time_since_hotend > timeout:
                 missing_sensors.append("hotend")
-        elif self._printer.is_printing() or self._printer.is_operational():
-            # If we're operational but never got hotend data, that's a problem
-            if current_time - self._startup_time > timeout:
-                missing_sensors.append("hotend")
+        elif current_time - self._startup_time > timeout:
+            # If we're operational but never got hotend data after startup timeout, that's a problem
+            missing_sensors.append("hotend")
         
         if self._last_heatbed_data_time is not None:
             time_since_heatbed = current_time - self._last_heatbed_data_time
