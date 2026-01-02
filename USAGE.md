@@ -204,4 +204,4 @@ pip uninstall octoprint-octo-fire-guard
 
 ## License
 
-AGPLv3 - See LICENSE file for details
+MIT - See LICENSE file for details
