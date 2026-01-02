@@ -24,6 +24,7 @@ $(function() {
         self.alertSensor = ko.observable("");
         self.alertCurrentTemp = ko.observable(0);
         self.alertThreshold = ko.observable(0);
+        self.alertAudioInterval = null;  // For continuous beeping
 
         // Load settings from the plugin settings
         self.onBeforeBinding = function() {
@@ -82,23 +83,85 @@ $(function() {
                 self.alertThreshold(data.threshold);
                 self.isAlertVisible(true);
 
-                // Play alert sound if available
-                if (typeof Audio !== "undefined") {
-                    try {
-                        var audio = new Audio("data:audio/wav;base64,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");
-                        audio.play();
-                    } catch(e) {
-                        console.error("Could not play alert sound:", e);
-                    }
+                // Show the Bootstrap modal
+                var modal = $("#octo_fire_guard_alert_modal");
+                if (modal.length) {
+                    modal.modal({
+                        backdrop: "static",  // Prevent closing by clicking outside
+                        keyboard: false      // Prevent closing with ESC key
+                    });
+                    modal.modal("show");
+                }
+
+                // Play continuous alert sound
+                self.startAlertSound();
+
+                // Show OctoPrint notification
+                if (typeof PNotify !== "undefined") {
+                    new PNotify({
+                        title: "Temperature Alert!",
+                        text: data.message + " - " + data.sensor + ": " + data.current_temp + "°C (Threshold: " + data.threshold + "°C)",
+                        type: "error",
+                        hide: false,  // Don't auto-hide
+                        icon: "fa fa-fire"
+                    });
                 }
             } catch (e) {
                 console.error("Octo Fire Guard: Error showing alert", e);
             }
         };
 
+        // Start continuous alert sound
+        self.startAlertSound = function() {
+            // Stop any existing alert sound
+            self.stopAlertSound();
+
+            if (typeof Audio !== "undefined") {
+                try {
+                    var audio = new Audio("data:audio/wav;base64,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");
+                    
+                    // Play sound immediately
+                    audio.play();
+                    
+                    // Set up interval for continuous beeping (every 2 seconds)
+                    self.alertAudioInterval = setInterval(function() {
+                        try {
+                            var beep = new Audio("data:audio/wav;base64,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");
+                            beep.play();
+                        } catch(e) {
+                            console.error("Could not play continuous alert sound:", e);
+                        }
+                    }, 2000);
+                } catch(e) {
+                    console.error("Could not start alert sound:", e);
+                }
+            }
+        };
+
+        // Stop continuous alert sound
+        self.stopAlertSound = function() {
+            if (self.alertAudioInterval) {
+                clearInterval(self.alertAudioInterval);
+                self.alertAudioInterval = null;
+            }
+        };
+
         // Close alert
         self.closeAlert = function() {
-            self.isAlertVisible(false);
+            try {
+                self.isAlertVisible(false);
+                
+                // Stop continuous beeping
+                self.stopAlertSound();
+                
+                // Hide the Bootstrap modal
+                var modal = $("#octo_fire_guard_alert_modal");
+                if (modal.length) {
+                    modal.modal("hide");
+                }
+            } catch (e) {
+                console.error("Octo Fire Guard: Error closing alert", e);
+            }
         };
 
         // Test alert functionality
