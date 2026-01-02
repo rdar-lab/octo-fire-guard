@@ -65,7 +65,11 @@ $(function() {
                 if (testButton) {
                     testButton.addEventListener("click", function(e) {
                         e.preventDefault();
-                        self.testAlert();
+                        try {
+                            self.testAlert();
+                        } catch (err) {
+                            console.error("Octo Fire Guard: Error calling testAlert", err);
+                        }
                     });
                 }
             } catch (e) {
