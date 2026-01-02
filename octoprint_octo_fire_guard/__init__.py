@@ -126,10 +126,8 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
             time_since_heatbed = current_time - self._last_heatbed_data_time
             if time_since_heatbed > timeout:
                 missing_sensors.append("heatbed")
-        elif current_time - self._startup_time > timeout:
-            # If we're operational but never got heatbed data after startup timeout, that's a problem
-            # Note: Not all printers have heatbeds, so this might be expected behavior
-            missing_sensors.append("heatbed")
+        # Note: We don't check for startup timeout on heatbed because not all printers have heatbeds
+        # We only warn if we've previously received heatbed data and then it stops
         
         # Send warning if we have missing sensors and haven't already warned about them
         if missing_sensors and not self._data_timeout_warning_sent:

@@ -978,7 +978,7 @@ class TestTemperatureDataMonitoring(unittest.TestCase):
     
     @patch('time.time')
     def test_check_timeout_never_received_data_after_startup(self, mock_time):
-        """Test that timeout is detected when no data received after startup timeout"""
+        """Test that timeout is detected when no hotend data received after startup timeout"""
         # Set startup time far in the past
         mock_time.return_value = 1000.0
         self.plugin._startup_time = 600.0  # 400 seconds ago
@@ -988,14 +988,16 @@ class TestTemperatureDataMonitoring(unittest.TestCase):
         
         self.plugin._check_temperature_data_timeout()
         
-        # Should warn about both sensors
+        # Should warn about hotend only (heatbed warning only happens if we've seen it before)
         self.assertTrue(self.plugin._data_timeout_warning_sent)
         self.plugin._plugin_manager.send_plugin_message.assert_called_once()
         
         args = self.plugin._plugin_manager.send_plugin_message.call_args
         message_data = args[0][1]
         self.assertIn("hotend", message_data["sensors"])
-        self.assertIn("heatbed", message_data["sensors"])
+        # Heatbed should NOT be warned about since we never received data from it
+        # (some printers don't have heatbeds)
+        self.assertNotIn("heatbed", message_data["sensors"])
 
 
 if __name__ == '__main__':
