@@ -25,6 +25,7 @@ $(function() {
         self.alertCurrentTemp = ko.observable(0);
         self.alertThreshold = ko.observable(0);
         self.alertAudioInterval = null;  // For continuous beeping
+        self.dataTimeoutNotification = null;  // Store reference to timeout notification for dismissal
         
         // Alert sound data (base64-encoded WAV)
         self.alertSoundData = "data:audio/wav;base64,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";
@@ -89,6 +90,8 @@ $(function() {
                 self.showAlert(data);
             } else if (data.type === "data_timeout_warning") {
                 self.showDataTimeoutWarning(data);
+            } else if (data.type === "data_timeout_cleared") {
+                self.dismissDataTimeoutWarning();
             }
         };
 
@@ -192,7 +195,7 @@ $(function() {
                 
                 // Show OctoPrint notification
                 if (typeof PNotify !== "undefined") {
-                    new PNotify({
+                    self.dataTimeoutNotification = new PNotify({
                         title: "Octo Fire Guard: Self-Test Warning",
                         text: "No temperature data received from " + sensorsStr + " for " + timeoutMinutes + " minutes. " +
                               "The plugin may not be monitoring correctly. Please check your printer connection.",
@@ -203,6 +206,19 @@ $(function() {
                 }
             } catch (e) {
                 console.error("Octo Fire Guard: Error showing data timeout warning", e);
+            }
+        };
+
+        // Dismiss data timeout warning notification
+        self.dismissDataTimeoutWarning = function() {
+            try {
+                if (self.dataTimeoutNotification) {
+                    self.dataTimeoutNotification.remove();
+                    self.dataTimeoutNotification = null;
+                    console.info("Octo Fire Guard: Temperature data timeout warning dismissed");
+                }
+            } catch (e) {
+                console.error("Octo Fire Guard: Error dismissing data timeout warning", e);
             }
         };
 
