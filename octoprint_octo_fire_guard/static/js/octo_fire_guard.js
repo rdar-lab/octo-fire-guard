@@ -109,12 +109,12 @@ $(function() {
         };
     }
 
-    // Register the view model with empty elements array to avoid conflicts with UI Customizer
-    // OctoPrint's automatic binding will handle #settings_plugin_octo_fire_guard (settings panel)
-    // We manually bind #octo_fire_guard_alert_modal in onAfterBinding for better compatibility
+    // Register the view model
+    // Include settings panel for automatic binding, but alert modal is bound manually in onAfterBinding
+    // to avoid conflicts with UI Customizer and other DOM-modifying plugins
     OCTOPRINT_VIEWMODELS.push({
         construct: OctoFireGuardViewModel,
         dependencies: ["settingsViewModel"],
-        elements: []
+        elements: ["#settings_plugin_octo_fire_guard"]
     });
 });
