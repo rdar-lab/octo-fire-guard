@@ -110,6 +110,9 @@ class TestOctoFireGuardPlugin(unittest.TestCase):
         self.assertFalse(plugin._hotend_threshold_exceeded)
         self.assertFalse(plugin._heatbed_threshold_exceeded)
         self.assertEqual(plugin._last_temperatures, {})
+        self.assertIsNone(plugin._last_hotend_data_time)
+        self.assertIsNone(plugin._last_heatbed_data_time)
+        self.assertFalse(plugin._data_timeout_warning_sent)
     
     def test_get_settings_defaults(self):
         """Test that default settings are correctly defined"""
@@ -122,6 +125,8 @@ class TestOctoFireGuardPlugin(unittest.TestCase):
         self.assertEqual(defaults["psu_plugin_name"], "psucontrol")
         self.assertTrue(defaults["enable_monitoring"])
         self.assertEqual(defaults["check_interval"], 1)
+        self.assertTrue(defaults["enable_data_monitoring"])
+        self.assertEqual(defaults["temperature_data_timeout"], 300)
     
     def test_get_settings_version(self):
         """Test that settings version is set"""
@@ -667,6 +672,288 @@ class TestPluginIntegration(unittest.TestCase):
         parsed_temps = {"tool0": (200.0, 210.0), "bed": (85.0, 100.0)}
         self.plugin.temperature_callback(None, parsed_temps)
         self.assertFalse(self.plugin._heatbed_threshold_exceeded)
+
+
+class TestTemperatureDataMonitoring(unittest.TestCase):
+    """Test suite for temperature data timeout monitoring"""
+    
+    def setUp(self):
+        """Set up test fixtures before each test"""
+        self.plugin = OctoFireGuardPlugin()
+        
+        # Mock the logger
+        self.plugin._logger = Mock()
+        
+        # Mock the settings
+        self.plugin._settings = Mock()
+        self.plugin._settings.get = Mock(side_effect=self._get_setting)
+        self.plugin._settings.get_boolean = Mock(side_effect=self._get_boolean_setting)
+        self.plugin._settings.get_float = Mock(side_effect=self._get_float_setting)
+        self.plugin._settings.get_int = Mock(side_effect=self._get_int_setting)
+        
+        # Mock the plugin manager
+        self.plugin._plugin_manager = Mock()
+        
+        # Mock the printer
+        self.plugin._printer = Mock()
+        self.plugin._printer.is_operational = Mock(return_value=True)
+        self.plugin._printer.is_printing = Mock(return_value=False)
+        
+        # Mock the identifier
+        self.plugin._identifier = "octo_fire_guard"
+        
+        # Default settings
+        self.settings_dict = {
+            "hotend_threshold": 250.0,
+            "heatbed_threshold": 100.0,
+            "termination_mode": "gcode",
+            "termination_gcode": "M112\nM104 S0\nM140 S0",
+            "psu_plugin_name": "psucontrol",
+            "enable_monitoring": True,
+            "check_interval": 1,
+            "enable_data_monitoring": True,
+            "temperature_data_timeout": 300
+        }
+    
+    def _get_setting(self, path):
+        """Helper to get settings from dict"""
+        key = path[0] if isinstance(path, list) else path
+        return self.settings_dict.get(key)
+    
+    def _get_boolean_setting(self, path):
+        """Helper to get boolean settings"""
+        return bool(self._get_setting(path))
+    
+    def _get_float_setting(self, path):
+        """Helper to get float settings"""
+        return float(self._get_setting(path))
+    
+    def _get_int_setting(self, path):
+        """Helper to get int settings"""
+        val = self._get_setting(path)
+        return int(val) if val is not None else 0
+    
+    def test_initialization_new_fields(self):
+        """Test that new monitoring fields are initialized"""
+        plugin = OctoFireGuardPlugin()
+        self.assertIsNone(plugin._last_hotend_data_time)
+        self.assertIsNone(plugin._last_heatbed_data_time)
+        self.assertFalse(plugin._data_timeout_warning_sent)
+        self.assertIsNone(plugin._monitoring_timer)
+    
+    def test_get_settings_defaults_includes_monitoring(self):
+        """Test that new settings are in defaults"""
+        defaults = self.plugin.get_settings_defaults()
+        self.assertIn("enable_data_monitoring", defaults)
+        self.assertIn("temperature_data_timeout", defaults)
+        self.assertTrue(defaults["enable_data_monitoring"])
+        self.assertEqual(defaults["temperature_data_timeout"], 300)
+    
+    def test_temperature_callback_updates_hotend_time(self):
+        """Test that temperature callback updates hotend data time"""
+        import time
+        before = time.time()
+        
+        parsed_temps = {"tool0": (200.0, 210.0), "bed": (80.0, 90.0)}
+        self.plugin.temperature_callback(None, parsed_temps)
+        
+        after = time.time()
+        
+        self.assertIsNotNone(self.plugin._last_hotend_data_time)
+        self.assertGreaterEqual(self.plugin._last_hotend_data_time, before)
+        self.assertLessEqual(self.plugin._last_hotend_data_time, after)
+    
+    def test_temperature_callback_updates_heatbed_time(self):
+        """Test that temperature callback updates heatbed data time"""
+        import time
+        before = time.time()
+        
+        parsed_temps = {"tool0": (200.0, 210.0), "bed": (80.0, 90.0)}
+        self.plugin.temperature_callback(None, parsed_temps)
+        
+        after = time.time()
+        
+        self.assertIsNotNone(self.plugin._last_heatbed_data_time)
+        self.assertGreaterEqual(self.plugin._last_heatbed_data_time, before)
+        self.assertLessEqual(self.plugin._last_heatbed_data_time, after)
+    
+    def test_temperature_callback_does_not_update_on_none(self):
+        """Test that None temperature doesn't update timestamps"""
+        parsed_temps = {"tool0": (None, 210.0), "bed": (None, 90.0)}
+        self.plugin.temperature_callback(None, parsed_temps)
+        
+        # Should remain None
+        self.assertIsNone(self.plugin._last_hotend_data_time)
+        self.assertIsNone(self.plugin._last_heatbed_data_time)
+    
+    def test_check_timeout_when_printer_not_operational(self):
+        """Test that timeout check does nothing when printer not operational"""
+        self.plugin._printer.is_operational.return_value = False
+        self.plugin._last_hotend_data_time = 100.0
+        self.plugin._last_heatbed_data_time = 100.0
+        
+        self.plugin._check_temperature_data_timeout()
+        
+        # Should reset times when not operational
+        self.assertIsNone(self.plugin._last_hotend_data_time)
+        self.assertIsNone(self.plugin._last_heatbed_data_time)
+        self.plugin._plugin_manager.send_plugin_message.assert_not_called()
+    
+    def test_check_timeout_when_monitoring_disabled(self):
+        """Test that timeout check does nothing when monitoring disabled"""
+        self.settings_dict["enable_data_monitoring"] = False
+        
+        self.plugin._check_temperature_data_timeout()
+        
+        self.plugin._plugin_manager.send_plugin_message.assert_not_called()
+    
+    @patch('time.time')
+    def test_check_timeout_hotend_timeout_detected(self, mock_time):
+        """Test that hotend timeout is detected"""
+        # Set last data time to 400 seconds ago
+        mock_time.return_value = 1000.0
+        self.plugin._last_hotend_data_time = 600.0  # 400 seconds ago
+        self.plugin._last_heatbed_data_time = 950.0  # Recent
+        
+        self.plugin._check_temperature_data_timeout()
+        
+        # Should send warning
+        self.assertTrue(self.plugin._data_timeout_warning_sent)
+        self.plugin._plugin_manager.send_plugin_message.assert_called_once()
+        
+        args = self.plugin._plugin_manager.send_plugin_message.call_args
+        message_data = args[0][1]
+        self.assertEqual(message_data["type"], "data_timeout_warning")
+        self.assertIn("hotend", message_data["sensors"])
+        self.assertNotIn("heatbed", message_data["sensors"])
+    
+    @patch('time.time')
+    def test_check_timeout_heatbed_timeout_detected(self, mock_time):
+        """Test that heatbed timeout is detected"""
+        # Set last data time to 400 seconds ago
+        mock_time.return_value = 1000.0
+        self.plugin._last_hotend_data_time = 950.0  # Recent
+        self.plugin._last_heatbed_data_time = 600.0  # 400 seconds ago
+        
+        self.plugin._check_temperature_data_timeout()
+        
+        # Should send warning
+        self.assertTrue(self.plugin._data_timeout_warning_sent)
+        self.plugin._plugin_manager.send_plugin_message.assert_called_once()
+        
+        args = self.plugin._plugin_manager.send_plugin_message.call_args
+        message_data = args[0][1]
+        self.assertEqual(message_data["type"], "data_timeout_warning")
+        self.assertIn("heatbed", message_data["sensors"])
+        self.assertNotIn("hotend", message_data["sensors"])
+    
+    @patch('time.time')
+    def test_check_timeout_both_sensors_timeout(self, mock_time):
+        """Test that both sensor timeouts are detected"""
+        mock_time.return_value = 1000.0
+        self.plugin._last_hotend_data_time = 600.0  # 400 seconds ago
+        self.plugin._last_heatbed_data_time = 600.0  # 400 seconds ago
+        
+        self.plugin._check_temperature_data_timeout()
+        
+        # Should send warning with both sensors
+        self.assertTrue(self.plugin._data_timeout_warning_sent)
+        args = self.plugin._plugin_manager.send_plugin_message.call_args
+        message_data = args[0][1]
+        self.assertIn("hotend", message_data["sensors"])
+        self.assertIn("heatbed", message_data["sensors"])
+    
+    @patch('time.time')
+    def test_check_timeout_no_warning_when_within_timeout(self, mock_time):
+        """Test that no warning when temperature data is recent"""
+        mock_time.return_value = 1000.0
+        self.plugin._last_hotend_data_time = 900.0  # 100 seconds ago (< 300)
+        self.plugin._last_heatbed_data_time = 900.0  # 100 seconds ago (< 300)
+        
+        self.plugin._check_temperature_data_timeout()
+        
+        # Should not send warning
+        self.assertFalse(self.plugin._data_timeout_warning_sent)
+        self.plugin._plugin_manager.send_plugin_message.assert_not_called()
+    
+    @patch('time.time')
+    def test_check_timeout_warning_sent_only_once(self, mock_time):
+        """Test that warning is only sent once"""
+        mock_time.return_value = 1000.0
+        self.plugin._last_hotend_data_time = 600.0
+        
+        # First check - should send warning
+        self.plugin._check_temperature_data_timeout()
+        self.assertEqual(self.plugin._plugin_manager.send_plugin_message.call_count, 1)
+        
+        # Second check - should not send again
+        self.plugin._plugin_manager.send_plugin_message.reset_mock()
+        self.plugin._check_temperature_data_timeout()
+        self.plugin._plugin_manager.send_plugin_message.assert_not_called()
+    
+    @patch('time.time')
+    def test_check_timeout_warning_clears_when_data_resumes(self, mock_time):
+        """Test that warning clears when data resumes"""
+        # First, trigger a timeout
+        mock_time.return_value = 1000.0
+        self.plugin._last_hotend_data_time = 600.0
+        self.plugin._check_temperature_data_timeout()
+        self.assertTrue(self.plugin._data_timeout_warning_sent)
+        
+        # Now data resumes
+        mock_time.return_value = 1050.0
+        self.plugin._last_hotend_data_time = 1050.0  # Updated to current time
+        self.plugin._check_temperature_data_timeout()
+        
+        # Warning state should clear
+        self.assertFalse(self.plugin._data_timeout_warning_sent)
+    
+    def test_temperature_callback_clears_warning_on_data_resume(self):
+        """Test that temperature callback clears warning when data resumes"""
+        # Set warning state
+        self.plugin._data_timeout_warning_sent = True
+        
+        # Receive temperature data for hotend only
+        parsed_temps = {"tool0": (200.0, 210.0)}
+        self.plugin.temperature_callback(None, parsed_temps)
+        
+        # Warning should be cleared after first sensor data
+        self.assertFalse(self.plugin._data_timeout_warning_sent)
+        self.plugin._logger.info.assert_any_call("Hotend temperature data resumed")
+        
+        # Reset for bed test
+        self.plugin._data_timeout_warning_sent = True
+        self.plugin._logger.info.reset_mock()
+        
+        # Receive temperature data for bed
+        parsed_temps = {"bed": (80.0, 90.0)}
+        self.plugin.temperature_callback(None, parsed_temps)
+        
+        # Warning should be cleared
+        self.assertFalse(self.plugin._data_timeout_warning_sent)
+        self.plugin._logger.info.assert_any_call("Heatbed temperature data resumed")
+    
+    def test_send_data_timeout_warning_message_format(self):
+        """Test the format of timeout warning message"""
+        missing_sensors = ["hotend", "heatbed"]
+        timeout = 300
+        
+        self.plugin._send_data_timeout_warning(missing_sensors, timeout)
+        
+        # Check logger was called
+        self.plugin._logger.warning.assert_called_once()
+        
+        # Check plugin message
+        self.plugin._plugin_manager.send_plugin_message.assert_called_once()
+        args = self.plugin._plugin_manager.send_plugin_message.call_args
+        
+        self.assertEqual(args[0][0], "octo_fire_guard")
+        message_data = args[0][1]
+        self.assertEqual(message_data["type"], "data_timeout_warning")
+        self.assertEqual(message_data["sensors"], ["hotend", "heatbed"])
+        self.assertEqual(message_data["timeout"], 300)
+        self.assertIn("5 minutes", message_data["message"])
+        self.assertIn("hotend and heatbed", message_data["message"])
 
 
 if __name__ == '__main__':
