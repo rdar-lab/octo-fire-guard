@@ -118,7 +118,7 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
             # Support both old format (tool0, tool1) and new format (T0, T1)
             # For new format: starts with 'T', has at least one more character, and all chars after 'T' are digits
             is_new_format_tool = (tool_key.startswith("T") and len(tool_key) >= 2 and 
-                                  tool_key[1:].isdigit() and len(tool_key[1:]) > 0)
+                                  tool_key[1:].isdigit())
             if tool_key.startswith("tool") or is_new_format_tool:
                 self._logger.debug("Checking hotend temperature for {}".format(tool_key))
                 temp_data = parsed_temperatures[tool_key]

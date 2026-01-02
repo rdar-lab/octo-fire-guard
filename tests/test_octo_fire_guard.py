@@ -716,7 +716,7 @@ class TestOctoFireGuardPlugin(unittest.TestCase):
         # None of the debug messages should indicate checking these as hotends
         debug_calls = self.plugin._logger.debug.call_args_list
         debug_strs = [str(call) for call in debug_calls]
-        self.assertFalse(any("Checking hotend temperature for T" == str(call) or 
+        self.assertFalse(any("Checking hotend temperature for T" in str(call) or 
                             "Checking hotend temperature for Ta" in str(call) or
                             "Checking hotend temperature for Tb" in str(call) for call in debug_strs))
     
