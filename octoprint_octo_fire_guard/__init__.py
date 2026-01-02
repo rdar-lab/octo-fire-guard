@@ -107,6 +107,8 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
             self._data_timeout_warning_sent = False
             self._last_hotend_data_time = None
             self._last_heatbed_data_time = None
+            if hasattr(self, "_warned_missing_sensors") and self._warned_missing_sensors is not None:
+                self._warned_missing_sensors.clear()
             return
 
         timeout = self._settings.get_int(["temperature_data_timeout"])
