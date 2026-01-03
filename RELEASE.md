@@ -62,8 +62,8 @@ Users will be notified of updates through OctoPrint's built-in update checker wh
 This project follows [Semantic Versioning](https://semver.org/):
 
 - **MAJOR** version: Incompatible API changes
-- **MINOR** version: Added functionality in a backwards compatible manner
-- **PATCH** version: Backwards compatible bug fixes
+- **MINOR** version: Added functionality in a backward compatible manner
+- **PATCH** version: Backward compatible bug fixes
 
 ## First Release
 
