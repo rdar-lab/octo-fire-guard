@@ -75,7 +75,10 @@ git checkout main
 git pull
 
 # Verify that setup.py contains version 1.0.0
-grep "plugin_version = \"1.0.0\"" setup.py || echo "WARNING: Version mismatch in setup.py"
+if ! grep -q 'plugin_version = "1.0.0"' setup.py; then
+  echo "WARNING: Version mismatch in setup.py" >&2
+  exit 1
+fi
 
 # Create and push the v1.0.0 tag
 git tag -a v1.0.0 -m "Release version 1.0.0 - Initial release"
