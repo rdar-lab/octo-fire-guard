@@ -31,9 +31,9 @@ jobs:
         # The awk script:
         # 1. Finds a line starting with "## [VERSION]" and sets flag=1 (start capturing)
         # 2. When it finds another "## [" line, sets flag=0 (stop capturing)
-        # 3. Prints all non-empty lines while flag=1
+        # 3. Prints all lines while flag=1 (preserves blank lines for readability)
         if [ -f "CHANGELOG.md" ]; then
-          awk '/^## \['"$VERSION"'\]/ { flag=1; next } /^## \[/ { flag=0 } flag && NF { print }' CHANGELOG.md > release_notes.txt
+          awk '/^## \['"$VERSION"'\]/ { flag=1; next } /^## \[/ { flag=0 } flag { print }' CHANGELOG.md > release_notes.txt
           
           if [ ! -s release_notes.txt ]; then
             echo "Release version $VERSION" > release_notes.txt
