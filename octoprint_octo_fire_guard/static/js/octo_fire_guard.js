@@ -124,7 +124,9 @@ $(function() {
                         text: data.message + " - " + data.sensor + ": " + data.current_temp + "°C (Threshold: " + data.threshold + "°C)",
                         type: "error",
                         hide: false,  // Don't auto-hide
-                        icon: "fa fa-fire"
+                        icon: "fa fa-fire",
+                        title_escape: true,
+                        text_escape: true
                     });
                 }
             } catch (e) {
@@ -201,7 +203,9 @@ $(function() {
                               "The plugin may not be monitoring correctly. Please check your printer connection.",
                         type: "warning",
                         hide: false,  // Don't auto-hide
-                        icon: "fa fa-exclamation-triangle"
+                        icon: "fa fa-exclamation-triangle",
+                        title_escape: true,
+                        text_escape: true
                     });
                 }
             } catch (e) {
@@ -264,7 +268,9 @@ $(function() {
                         text: "Executing emergency actions...",
                         type: "info",
                         hide: true,
-                        delay: 3000
+                        delay: 3000,
+                        title_escape: true,
+                        text_escape: true
                     });
                 }
                 
@@ -287,7 +293,9 @@ $(function() {
                                 text: message,
                                 type: "success",
                                 hide: true,
-                                delay: 5000
+                                delay: 5000,
+                                title_escape: true,
+                                text_escape: true
                             });
                         }
                     })
@@ -305,7 +313,9 @@ $(function() {
                                 title: "Test Failed",
                                 text: errorMsg,
                                 type: "error",
-                                hide: false
+                                hide: false,
+                                title_escape: true,
+                                text_escape: true
                             });
                         }
                     });
