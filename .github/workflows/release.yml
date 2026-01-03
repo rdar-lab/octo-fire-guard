@@ -28,8 +28,11 @@ jobs:
         VERSION=${{ steps.get_version.outputs.VERSION }}
         
         # Extract the section for this version from CHANGELOG.md
+        # The awk script:
+        # 1. Finds a line starting with "## [VERSION]" and sets flag=1 (start capturing)
+        # 2. When it finds another "## [" line, sets flag=0 (stop capturing)
+        # 3. Prints all non-empty lines while flag=1
         if [ -f "CHANGELOG.md" ]; then
-          # Use grep to find the version header, then use awk to extract the section
           awk '/^## \['"$VERSION"'\]/ { flag=1; next } /^## \[/ { flag=0 } flag && NF { print }' CHANGELOG.md > release_notes.txt
           
           if [ ! -s release_notes.txt ]; then
@@ -39,12 +42,23 @@ jobs:
           echo "Release version $VERSION" > release_notes.txt
         fi
     
+    - name: Check if pre-release
+      id: prerelease
+      run: |
+        VERSION=${{ steps.get_version.outputs.VERSION }}
+        # Check if version contains pre-release identifiers (alpha, beta, rc, etc.)
+        if echo "$VERSION" | grep -qE '(alpha|beta|rc|pre|dev)'; then
+          echo "IS_PRERELEASE=true" >> $GITHUB_OUTPUT
+        else
+          echo "IS_PRERELEASE=false" >> $GITHUB_OUTPUT
+        fi
+    
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
       with:
         body_path: release_notes.txt
         draft: false
-        prerelease: false
+        prerelease: ${{ steps.prerelease.outputs.IS_PRERELEASE }}
         generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
