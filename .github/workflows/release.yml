@@ -1,0 +1,53 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v1.0.0, v1.0.1, etc.
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Extract version from tag
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+    
+    - name: Extract changelog for version
+      id: changelog
+      run: |
+        VERSION=${{ steps.get_version.outputs.VERSION }}
+        
+        # Extract the section for this version from CHANGELOG.md
+        if [ -f "CHANGELOG.md" ]; then
+          awk -v ver="$VERSION" '
+            /^## \['"$VERSION"'\]/ { flag=1; next }
+            /^## \[/ { flag=0 }
+            flag && NF { print }
+          ' CHANGELOG.md > release_notes.txt
+          
+          if [ ! -s release_notes.txt ]; then
+            echo "Release version $VERSION" > release_notes.txt
+          fi
+        else
+          echo "Release version $VERSION" > release_notes.txt
+        fi
+    
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        body_path: release_notes.txt
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
