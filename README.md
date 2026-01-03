@@ -235,6 +235,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
+## Releases
+
+This plugin uses GitHub releases for version management and plugin updates. The release process is automated via GitHub Actions.
+
+For maintainers: See [RELEASE.md](RELEASE.md) for detailed instructions on how to create a new release.
+
+Users will be notified of available updates through OctoPrint's built-in Software Update plugin.
+
 ## Support
 
 If you encounter any issues or have suggestions, please [open an issue](https://github.com/rdar-lab/octo-fire-guard/issues) on GitHub.

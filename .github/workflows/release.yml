@@ -1,0 +1,64 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v1.0.0, v1.0.1, etc.
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Extract version from tag
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+    
+    - name: Extract changelog for version
+      id: changelog
+      run: |
+        VERSION=${{ steps.get_version.outputs.VERSION }}
+        
+        # Extract the section for this version from CHANGELOG.md
+        # The awk script:
+        # 1. Finds a line starting with "## [VERSION]" and sets flag=1 (start capturing)
+        # 2. When it finds another "## [" line, sets flag=0 (stop capturing)
+        # 3. Prints all lines while flag=1 (preserves blank lines for readability)
+        if [ -f "CHANGELOG.md" ]; then
+          awk '/^## \['"$VERSION"'\]/ { flag=1; next } /^## \[/ { flag=0 } flag { print }' CHANGELOG.md > release_notes.txt
+          
+          if [ ! -s release_notes.txt ]; then
+            echo "Release version $VERSION" > release_notes.txt
+          fi
+        else
+          echo "Release version $VERSION" > release_notes.txt
+        fi
+    
+    - name: Check if pre-release
+      id: prerelease
+      run: |
+        VERSION=${{ steps.get_version.outputs.VERSION }}
+        # Check if version contains pre-release identifiers (alpha, beta, rc, etc.)
+        if echo "$VERSION" | grep -qE '(alpha|beta|rc|pre|dev)'; then
+          echo "IS_PRERELEASE=true" >> $GITHUB_OUTPUT
+        else
+          echo "IS_PRERELEASE=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        body_path: release_notes.txt
+        draft: false
+        prerelease: ${{ steps.prerelease.outputs.IS_PRERELEASE }}
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
