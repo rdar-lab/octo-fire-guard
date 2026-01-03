@@ -8,7 +8,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  python-tests:
+    name: Python Tests
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -32,3 +33,26 @@ jobs:
     - name: Run tests with verbose output
       if: failure()
       run: python3 tests/test_octo_fire_guard.py -v
+
+  javascript-tests:
+    name: JavaScript Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run JavaScript tests
+      run: npm test
+    
+    - name: Run tests with coverage
+      run: npm run test:coverage

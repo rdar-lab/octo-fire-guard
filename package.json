@@ -1,0 +1,47 @@
+{
+  "name": "octo-fire-guard",
+  "version": "1.0.0",
+  "description": "Temperature monitoring plugin that prevents fire hazards by monitoring hotend and heatbed temperatures",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rdar-lab/octo-fire-guard.git"
+  },
+  "keywords": [
+    "octoprint",
+    "plugin",
+    "temperature",
+    "monitoring",
+    "safety"
+  ],
+  "author": "OctoPrint Fire Guard Team",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/rdar-lab/octo-fire-guard/issues"
+  },
+  "homepage": "https://github.com/rdar-lab/octo-fire-guard#readme",
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "testMatch": [
+      "**/tests/**/*.test.js",
+      "**/tests/**/*.spec.js"
+    ],
+    "collectCoverageFrom": [
+      "octoprint_octo_fire_guard/static/js/**/*.js"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "html"
+    ]
+  }
+}
