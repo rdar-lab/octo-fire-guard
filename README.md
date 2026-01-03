@@ -7,7 +7,7 @@ An OctoPrint plugin that monitors printer temperatures in real-time to prevent f
 ---
 
 > [!WARNING]
-> **<span style="color:red">⚠️ THIS PLUGIN IS A SAFETY FEATURE, NOT A REPLACEMENT FOR PROPER PRINTER SUPERVISION ⚠️</span>**
+> **⚠️ THIS PLUGIN IS A SAFETY FEATURE, NOT A REPLACEMENT FOR PROPER PRINTER SUPERVISION ⚠️**
 > 
 > **This plugin does not guarantee safety and should not be relied upon as the sole fire prevention mechanism. Always monitor your printer during operation. OctoPrint may not be running, the plugin may malfunction, or other failure modes may occur that prevent the plugin from responding to dangerous conditions.**
 
