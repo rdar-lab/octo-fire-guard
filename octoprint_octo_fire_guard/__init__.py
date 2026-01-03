@@ -3,6 +3,7 @@ from __future__ import absolute_import
 
 import octoprint.plugin
 import octoprint.util
+import octoprint.access.permissions as permissions
 import flask
 import time
 import threading
@@ -224,6 +225,11 @@ class OctoFireGuardPlugin(octoprint.plugin.SettingsPlugin,
             )
             return flask.jsonify(success=True)
         elif command == "test_emergency_actions":
+            # Check if user has CONTROL permission
+            if not permissions.Permissions.CONTROL.can():
+                self._logger.warning("User without CONTROL permission attempted to test emergency actions")
+                return flask.jsonify(success=False, error="Insufficient permissions. CONTROL permission required."), 403
+            
             self._logger.info("Testing emergency actions")
             termination_mode = self._settings.get(["termination_mode"])
             
