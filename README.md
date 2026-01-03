@@ -165,9 +165,13 @@ octo-fire-guard/
 
 ### Testing
 
-The plugin includes a comprehensive unit test suite covering all major functionality, including the new self-test monitoring feature.
+The plugin includes comprehensive unit test suites for both Python backend and JavaScript frontend code.
 
-To run the tests:
+#### Python Tests
+
+The Python test suite covers all backend functionality including temperature monitoring, emergency shutdown, and alert systems.
+
+To run the Python tests:
 
 ```bash
 python3 run_tests.py
@@ -179,7 +183,43 @@ Or run tests directly:
 python3 tests/test_octo_fire_guard.py -v
 ```
 
-See [tests/README.md](tests/README.md) for detailed information about the test suite.
+See [tests/README.md](tests/README.md) for detailed information about the Python test suite.
+
+#### JavaScript Tests
+
+The JavaScript test suite covers all frontend functionality including the ViewModel, alert display, and API interactions.
+
+To run the JavaScript tests:
+
+```bash
+npm test
+```
+
+To run tests with coverage:
+
+```bash
+npm run test:coverage
+```
+
+To run tests in watch mode (for development):
+
+```bash
+npm run test:watch
+```
+
+**Note**: You need to install Node.js dependencies first:
+
+```bash
+npm install
+```
+
+The JavaScript tests use [Jest](https://jestjs.io/) as the testing framework and cover 43 test cases including:
+- ViewModel initialization and settings loading
+- Event handler attachments
+- Plugin message handling
+- Alert display and audio controls
+- API command interactions
+- Error handling and edge cases
 
 ## License
 
