@@ -29,11 +29,8 @@ jobs:
         
         # Extract the section for this version from CHANGELOG.md
         if [ -f "CHANGELOG.md" ]; then
-          awk -v ver="$VERSION" '
-            /^## \['"$VERSION"'\]/ { flag=1; next }
-            /^## \[/ { flag=0 }
-            flag && NF { print }
-          ' CHANGELOG.md > release_notes.txt
+          # Use grep to find the version header, then use awk to extract the section
+          awk '/^## \['"$VERSION"'\]/ { flag=1; next } /^## \[/ { flag=0 } flag && NF { print }' CHANGELOG.md > release_notes.txt
           
           if [ ! -s release_notes.txt ]; then
             echo "Release version $VERSION" > release_notes.txt

@@ -74,6 +74,9 @@ To publish the initial v1.0.0 release (which is already documented but not publi
 git checkout main
 git pull
 
+# Verify that setup.py contains version 1.0.0
+grep "plugin_version = \"1.0.0\"" setup.py || echo "WARNING: Version mismatch in setup.py"
+
 # Create and push the v1.0.0 tag
 git tag -a v1.0.0 -m "Release version 1.0.0 - Initial release"
 git push origin v1.0.0
