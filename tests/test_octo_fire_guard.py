@@ -14,6 +14,19 @@ import os
 # Before importing anything, we need to mock the OctoPrint dependencies
 # We'll patch them at import time to avoid metaclass conflicts
 
+# Mock permissions module first
+class FakePermissions:
+    class Permissions:
+        class CONTROL:
+            @staticmethod
+            def can():
+                # Default to True for existing tests to pass
+                return True
+
+# Create fake access module
+class FakeAccess:
+    permissions = FakePermissions
+
 # Create a module-level mock for octoprint
 class FakeOctoprint:
     class plugin:
@@ -50,6 +63,9 @@ class FakeOctoprint:
             
             def cancel(self):
                 self.is_running = False
+    
+    # Add access submodule
+    access = FakeAccess
 
 # Mock flask module
 class FakeFlask:
@@ -61,6 +77,8 @@ class FakeFlask:
 sys.modules['octoprint'] = FakeOctoprint()
 sys.modules['octoprint.plugin'] = FakeOctoprint.plugin
 sys.modules['octoprint.util'] = FakeOctoprint.util
+sys.modules['octoprint.access'] = FakeAccess
+sys.modules['octoprint.access.permissions'] = FakePermissions
 sys.modules['flask'] = FakeFlask()
 
 # Add parent directory to path to import the plugin
@@ -217,9 +235,12 @@ class TestOctoFireGuardPlugin(unittest.TestCase):
         
         mock_jsonify.assert_called_once_with(success=True)
     
+    @patch('octoprint.access.permissions.Permissions.CONTROL.can')
     @patch('flask.jsonify')
-    def test_on_api_command_test_emergency_actions_gcode(self, mock_jsonify):
+    def test_on_api_command_test_emergency_actions_gcode(self, mock_jsonify, mock_permission_can):
         """Test that test_emergency_actions API command works in GCode mode"""
+        # Mock permission check to return True
+        mock_permission_can.return_value = True
         mock_jsonify.return_value = {"success": True, "mode": "gcode", "message": "GCode commands executed successfully"}
         
         result = self.plugin.on_api_command("test_emergency_actions", {})
@@ -236,9 +257,12 @@ class TestOctoFireGuardPlugin(unittest.TestCase):
         mock_jsonify.assert_called_once_with(success=True, mode="gcode", message="GCode commands executed successfully")
         self.assertEqual(result, {"success": True, "mode": "gcode", "message": "GCode commands executed successfully"})
     
+    @patch('octoprint.access.permissions.Permissions.CONTROL.can')
     @patch('flask.jsonify')
-    def test_on_api_command_test_emergency_actions_psu(self, mock_jsonify):
+    def test_on_api_command_test_emergency_actions_psu(self, mock_jsonify, mock_permission_can):
         """Test that test_emergency_actions API command works in PSU mode"""
+        # Mock permission check to return True
+        mock_permission_can.return_value = True
         self.settings_dict["termination_mode"] = "psu"
         mock_jsonify.return_value = {"success": True, "mode": "psu", "message": "PSU termination executed successfully"}
         
@@ -265,9 +289,12 @@ class TestOctoFireGuardPlugin(unittest.TestCase):
         mock_jsonify.assert_called_once_with(success=True, mode="psu", message="PSU termination executed successfully")
         self.assertEqual(result, {"success": True, "mode": "psu", "message": "PSU termination executed successfully"})
     
+    @patch('octoprint.access.permissions.Permissions.CONTROL.can')
     @patch('flask.jsonify')
-    def test_on_api_command_test_emergency_actions_unknown_mode(self, mock_jsonify):
+    def test_on_api_command_test_emergency_actions_unknown_mode(self, mock_jsonify, mock_permission_can):
         """Test that test_emergency_actions handles unknown termination mode"""
+        # Mock permission check to return True
+        mock_permission_can.return_value = True
         self.settings_dict["termination_mode"] = "invalid_mode"
         mock_response = {"success": False, "error": "Unknown termination mode"}
         mock_jsonify.return_value = mock_response
@@ -285,9 +312,12 @@ class TestOctoFireGuardPlugin(unittest.TestCase):
         self.assertEqual(result[0], mock_response)
         self.assertEqual(result[1], 400)
     
+    @patch('octoprint.access.permissions.Permissions.CONTROL.can')
     @patch('flask.jsonify')
-    def test_on_api_command_test_emergency_actions_exception(self, mock_jsonify):
+    def test_on_api_command_test_emergency_actions_exception(self, mock_jsonify, mock_permission_can):
         """Test that test_emergency_actions handles exceptions during execution"""
+        # Mock permission check to return True
+        mock_permission_can.return_value = True
         mock_response = {"success": False, "error": "Failed to execute emergency actions. Check the logs for details."}
         mock_jsonify.return_value = mock_response
         
@@ -306,6 +336,53 @@ class TestOctoFireGuardPlugin(unittest.TestCase):
         self.assertEqual(len(result), 2)
         self.assertEqual(result[0], mock_response)
         self.assertEqual(result[1], 500)
+    
+    @patch('octoprint.access.permissions.Permissions.CONTROL.can')
+    @patch('flask.jsonify')
+    def test_on_api_command_test_emergency_actions_without_permission(self, mock_jsonify, mock_permission_can):
+        """Test that test_emergency_actions requires CONTROL permission"""
+        # Mock permission check to return False (user doesn't have CONTROL permission)
+        mock_permission_can.return_value = False
+        mock_response = {"success": False, "error": "Insufficient permissions. CONTROL permission required."}
+        mock_jsonify.return_value = mock_response
+        
+        result = self.plugin.on_api_command("test_emergency_actions", {})
+        
+        # Verify permission check was called
+        mock_permission_can.assert_called_once()
+        
+        # Verify warning was logged
+        self.plugin._logger.warning.assert_called_once_with("User without CONTROL permission attempted to test emergency actions")
+        
+        # Verify no emergency actions were executed
+        self.plugin._printer.commands.assert_not_called()
+        
+        # Verify the API response with 403 status
+        mock_jsonify.assert_called_once_with(success=False, error="Insufficient permissions. CONTROL permission required.")
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0], mock_response)
+        self.assertEqual(result[1], 403)
+    
+    @patch('octoprint.access.permissions.Permissions.CONTROL.can')
+    @patch('flask.jsonify')
+    def test_on_api_command_test_emergency_actions_with_permission(self, mock_jsonify, mock_permission_can):
+        """Test that test_emergency_actions works when user has CONTROL permission"""
+        # Mock permission check to return True (user has CONTROL permission)
+        mock_permission_can.return_value = True
+        mock_jsonify.return_value = {"success": True, "mode": "gcode", "message": "GCode commands executed successfully"}
+        
+        result = self.plugin.on_api_command("test_emergency_actions", {})
+        
+        # Verify permission check was called
+        mock_permission_can.assert_called_once()
+        
+        # Verify emergency actions were executed
+        self.plugin._logger.info.assert_any_call("Testing emergency actions")
+        self.plugin._printer.commands.assert_called()
+        
+        # Verify the API response is successful
+        self.assertEqual(result, {"success": True, "mode": "gcode", "message": "GCode commands executed successfully"})
 
     def test_is_api_protected(self):
         """Test that API protection is explicitly declared"""
