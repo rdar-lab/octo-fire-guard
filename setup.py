@@ -24,7 +24,7 @@ plugin_description = """Temperature monitoring plugin that prevents fire hazards
 plugin_author = "OctoPrint Fire Guard Team"
 
 # The plugin's author's mail address.
-plugin_author_email = "fireguard@example.com"
+plugin_author_email = "xmmlbox@proton.me"
 
 # The plugin's homepage URL. Can be overwritten within OctoPrint's internal data via __plugin_url__ in the plugin module
 plugin_url = "https://github.com/rdar-lab/octo-fire-guard"
